@@ -1,8 +1,7 @@
 package fr.epita.service;
 
 import fr.epita.model.Student;
-import fr.epita.repository.impl.StudentRepository;
-import fr.epita.service.impl.StudentService;
+import fr.epita.repository.StudentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -30,11 +29,11 @@ public class StudentServiceTest {
     public void setUp() {
         MockitoAnnotations.openMocks(this);
         student = new Student.Builder()
-                .setName("John")
-                .setSurname("Doe")
-                .setEmail("john@example.com")
-                .setAge(25)
-                .setAddress("123 Main St")
+                .setName("Jordy")
+                .setSurname("Meye")
+                .setEmail("jordy@outlook.com")
+                .setAge(28)
+                .setAddress("789 Pine Road")
                 .build();
     }
 
@@ -45,7 +44,7 @@ public class StudentServiceTest {
         Student createdStudent = studentService.create(student);
         
         assertNotNull(createdStudent);
-        assertEquals("John", createdStudent.getName());
+        assertEquals("Jordy", createdStudent.getName());
         verify(studentRepository, times(1)).save(student);
     }
 
@@ -58,7 +57,7 @@ public class StudentServiceTest {
         Optional<Student> foundStudent = studentService.getById(id);
         
         assertTrue(foundStudent.isPresent());
-        assertEquals("John", foundStudent.get().getName());
+        assertEquals("Jordy", foundStudent.get().getName());
         verify(studentRepository, times(1)).findById(id);
     }
 
@@ -84,11 +83,60 @@ public class StudentServiceTest {
 
     @Test
     public void testFindByEmail() {
-        when(studentRepository.findByEmail("john@example.com")).thenReturn(Optional.of(student));
+        when(studentRepository.findByEmail("jordy@outlook.com")).thenReturn(Optional.of(student));
         
-        Optional<Student> foundStudent = studentService.findByEmail("john@example.com");
+        Optional<Student> foundStudent = studentService.findByEmail("jordy@outlook.com");
         
         assertTrue(foundStudent.isPresent());
-        assertEquals("john@example.com", foundStudent.get().getEmail());
+        assertEquals("jordy@outlook.com", foundStudent.get().getEmail());
     }
-}
+
+    @Test
+    public void testFindByName() {
+        List<Student> students = Arrays.asList(student);
+        when(studentRepository.findByName("Jordy")).thenReturn(students);
+        
+        List<Student> result = studentService.findByName("Jordy");
+        
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        verify(studentRepository, times(1)).findByName("Jordy");
+    }
+
+    @Test
+    public void testFindByAge() {
+        List<Student> students = Arrays.asList(student);
+        when(studentRepository.findByAge(28)).thenReturn(students);
+        
+        List<Student> result = studentService.findByAge(28);
+        
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        verify(studentRepository, times(1)).findByAge(28);
+    }
+
+    @Test
+    public void testUpdateStudent() {
+        student.setId(1L);
+        when(studentRepository.save(student)).thenReturn(student);
+        
+        Student updatedStudent = studentService.update(student);
+        
+        assertNotNull(updatedStudent);
+        assertEquals("Jordy", updatedStudent.getName());
+        verify(studentRepository, times(1)).save(student);
+    }
+
+    @Test
+    public void testUpdateStudentWithoutId() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            studentService.update(student);
+        });
+    }
+
+    @Test
+    public void testDeleteAll() {
+        studentService.deleteAll();
+        verify(studentRepository, times(1)).deleteAll();
+    }}
+

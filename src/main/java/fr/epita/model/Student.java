@@ -24,11 +24,21 @@ public class Student {
     @Column
     private String address;
 
-
-    private Student() {
+    // Default constructor (required for JPA/Jackson)
+    public Student() {
     }
 
-    public Student(Builder builder){
+    // Full constructor
+    public Student(String name, String surname, String email, int age, String address) {
+        this.name = name;
+        this.surname = surname;
+        this.email = email;
+        this.age = age;
+        this.address = address;
+    }
+
+    // Builder constructor
+    public Student(Builder builder) {
         this.name = builder.name;
         this.surname = builder.surname;
         this.email = builder.email;

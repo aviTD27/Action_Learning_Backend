@@ -1,7 +1,7 @@
 package fr.epita.controller;
 
-import fr.epita.dto.CohortResponse;
-import fr.epita.dto.CreateCohortRequest;
+import fr.epita.dto.Response.CohortResponse;
+import fr.epita.dto.Request.CreateCohortRequest;
 import fr.epita.service.CohortService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

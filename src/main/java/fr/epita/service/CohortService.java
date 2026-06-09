@@ -1,9 +1,12 @@
 package fr.epita.service;
 
-import fr.epita.dto.CohortResponse;
-import fr.epita.dto.CreateCohortRequest;
+import fr.epita.dto.Response.CohortResponse;
+import fr.epita.dto.Request.CreateCohortRequest;
+import fr.epita.enums.CohortStatus;
 import fr.epita.model.Cohort;
+import fr.epita.model.Programme;
 import fr.epita.repository.CohortRepository;
+import fr.epita.repository.ProgrammeRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +19,7 @@ import java.util.List;
 public class CohortService {
 
     private final CohortRepository cohortRepository;
+    private final ProgrammeRepository programmeRepository;
 
     public List<CohortResponse> getAll() {
         return cohortRepository.findAll()
@@ -25,11 +29,13 @@ public class CohortService {
     }
 
     @Transactional
-    public CohortResponse create(CreateCohortRequest req) {
+    public CohortResponse create(CreateCohortRequest request) {
+        Programme programme = programmeRepository.findById(request.getProgrammeId())
+                .orElseThrow(() -> new EntityNotFoundException("Programme not found"));
         Cohort cohort = Cohort.builder()
-                .name(req.getName())
-                .programme(req.getProgramme())
-                .status("not_started")
+                .name(request.getName())
+                .programme(programme)
+                .status(CohortStatus.NOT_STARTED)
                 .archived(false)
                 .build();
 
@@ -37,12 +43,14 @@ public class CohortService {
     }
 
     @Transactional
-    public CohortResponse update(Long id, CreateCohortRequest req) {
+    public CohortResponse update(Long id, CreateCohortRequest request) {
         Cohort cohort = cohortRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Cohort not found"));
+        Programme programme = programmeRepository.findById(request.getProgrammeId())
+                .orElseThrow(() -> new EntityNotFoundException("Programme not found"));
 
-        cohort.setName(req.getName());
-        cohort.setProgramme(req.getProgramme());
+        cohort.setName(request.getName());
+        cohort.setProgramme(programme);
 
         return toResponse(cohortRepository.save(cohort));
     }
@@ -53,17 +61,18 @@ public class CohortService {
                 .orElseThrow(() -> new EntityNotFoundException("Cohort not found"));
 
         cohort.setArchived(true);
-        cohort.setStatus("archived");
+        cohort.setStatus(CohortStatus.ARCHIVED);
 
         cohortRepository.save(cohort);
     }
 
-    private CohortResponse toResponse(Cohort c) {
+    private CohortResponse toResponse(Cohort cohort) {
         return CohortResponse.builder()
-                .id(c.getId())
-                .name(c.getName())
-                .programme(c.getProgramme())
-                .status(c.getStatus())
+                .id(cohort.getId())
+                .name(cohort.getName())
+                .programmeId(cohort.getProgramme().getId())
+                .programmeName(cohort.getProgramme().getName())
+                .status(cohort.getStatus().name())
                 .build();
     }
 }

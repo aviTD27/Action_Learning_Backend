@@ -1,5 +1,6 @@
 package fr.epita.model;
 
+import fr.epita.enums.CohortStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -21,13 +22,19 @@ public class Cohort {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false)
-    private String programme;
+    @ManyToOne
+    @JoinColumn(name = "programme_id", nullable = false)
+    private Programme programme;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status = "not_started";
+    private CohortStatus status = CohortStatus.NOT_STARTED;
 
     @Column(nullable = false)
     private Boolean archived = false;
+
+    // TODO Add University relationship
+
+    // TODO Add Student list
 }
 

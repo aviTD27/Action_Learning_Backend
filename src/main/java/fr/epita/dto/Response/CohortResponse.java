@@ -1,4 +1,4 @@
-package fr.epita.dto;
+package fr.epita.dto.Response;
 
 import lombok.*;
 
@@ -9,7 +9,8 @@ import lombok.*;
 public class CohortResponse {
     private Long id;
     private String name;
-    private String programme;
+    private Long programmeId;
+    private String programmeName;
     private String status;
 }
 

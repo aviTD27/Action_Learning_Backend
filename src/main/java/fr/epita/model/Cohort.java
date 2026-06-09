@@ -1,5 +1,6 @@
 package fr.epita.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import fr.epita.enums.CohortStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -30,11 +31,11 @@ public class Cohort {
     @Column(nullable = false)
     private CohortStatus status = CohortStatus.NOT_STARTED;
 
-    @Column(nullable = false)
-    private Boolean archived = false;
+    @OneToMany(mappedBy = "cohort")
+    @JsonIgnore
+    private List<Student> students;
 
     // TODO Add University relationship
 
-    // TODO Add Student list
 }
 

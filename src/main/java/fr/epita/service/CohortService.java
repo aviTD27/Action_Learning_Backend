@@ -36,7 +36,6 @@ public class CohortService {
                 .name(request.getName())
                 .programme(programme)
                 .status(CohortStatus.NOT_STARTED)
-                .archived(false)
                 .build();
 
         return toResponse(cohortRepository.save(cohort));
@@ -60,7 +59,6 @@ public class CohortService {
         Cohort cohort = cohortRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Cohort not found"));
 
-        cohort.setArchived(true);
         cohort.setStatus(CohortStatus.ARCHIVED);
 
         cohortRepository.save(cohort);

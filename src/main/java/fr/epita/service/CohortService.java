@@ -21,9 +21,11 @@ public class CohortService {
     private final CohortRepository cohortRepository;
     private final ProgrammeRepository programmeRepository;
 
-    public List<CohortResponse> getAll() {
-        return cohortRepository.findAll()
-                .stream()
+    public List<CohortResponse> getAll(Long universityId) {
+        List<Cohort> cohorts = (universityId != null)
+                ? cohortRepository.findByProgramme_UniversityId(universityId)
+                : cohortRepository.findAll();
+        return cohorts.stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -50,18 +52,11 @@ public class CohortService {
 
         cohort.setName(request.getName());
         cohort.setProgramme(programme);
+        if (request.getStatus() != null) {
+            cohort.setStatus(request.getStatus());
+        }
 
         return toResponse(cohortRepository.save(cohort));
-    }
-
-    @Transactional
-    public void archive(Long id) {
-        Cohort cohort = cohortRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Cohort not found"));
-
-        cohort.setStatus(CohortStatus.ARCHIVED);
-
-        cohortRepository.save(cohort);
     }
 
     private CohortResponse toResponse(Cohort cohort) {

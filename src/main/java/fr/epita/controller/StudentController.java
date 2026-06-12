@@ -25,8 +25,9 @@ public class StudentController {
 
     // GET ALL
     @GetMapping
-    public ResponseEntity<List<StudentResponse>> getAll() {
-        return ResponseEntity.ok(studentService.getAll());
+    public ResponseEntity<List<StudentResponse>> getAll(
+            @RequestParam(required = false) Long universityId) {
+        return ResponseEntity.ok(studentService.getAll(universityId));
     }
 
     // GET BY COHORT

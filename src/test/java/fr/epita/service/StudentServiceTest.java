@@ -93,7 +93,7 @@ public class StudentServiceTest {
     void testGetAllStudents() {
         when(studentRepo.findAll()).thenReturn(List.of(student));
 
-        List<StudentResponse> res = studentService.getAll();
+        List<StudentResponse> res = studentService.getAll(null);
 
         assertEquals(1, res.size());
     }

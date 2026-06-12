@@ -23,9 +23,11 @@ public class StudentService {
     private final CohortRepository cohortRepository;
     private final ProgrammeRepository programmeRepository;
 
-    public List<StudentResponse> getAll() {
-        return studentRepository.findAll()
-                .stream()
+    public List<StudentResponse> getAll(Long universityId) {
+        List<Student> students = (universityId != null)
+                ? studentRepository.findByProgramme_UniversityId(universityId)
+                : studentRepository.findAll();
+        return students.stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -41,10 +43,10 @@ public class StudentService {
     public StudentResponse create(CreateStudentRequest request) {
 
         if (studentRepository.existsByEmail(request.getEmail()))
-            throw new RuntimeException("Email already exists");
+            throw new IllegalStateException("Email already exists");
 
         if (studentRepository.existsByStudentRef(request.getStudentRef()))
-            throw new RuntimeException("Student reference already exists");
+            throw new IllegalStateException("Student reference already exists");
 
         Cohort cohort = cohortRepository.findById(request.getCohortId())
                 .orElseThrow(() -> new EntityNotFoundException("Cohort not found"));
@@ -56,6 +58,7 @@ public class StudentService {
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .email(request.getEmail())
+                .password(request.getPassword())
                 .studentRef(request.getStudentRef())
                 .programme(programme)
                 .status(request.getStatus())
@@ -74,6 +77,9 @@ public class StudentService {
         student.setFirstName(request.getFirstName());
         student.setLastName(request.getLastName());
         student.setEmail(request.getEmail());
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            student.setPassword(request.getPassword());
+        }
         student.setStudentRef(request.getStudentRef());
         student.setStatus(request.getStatus());
 

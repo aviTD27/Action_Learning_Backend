@@ -17,17 +17,8 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     boolean existsByStudentRef(String studentRef);
 
     List<Student> findByCohortId(Long cohortId);
+    List<Student> findByProgramme_UniversityId(Long universityId);
 
     List<Student> findByStatus(StudentStatus status);
-
-//    @Query(value = "SELECT * FROM students WHERE email = :email LIMIT 1", nativeQuery = true)
-//    Optional<Student> findByEmail(@Param("email") String email);
-//
-//    @Query(value = "SELECT * FROM students WHERE LOWER(name) LIKE LOWER(CONCAT('%', :name, '%')) ORDER BY name ASC", nativeQuery = true)
-//    List<Student> findByName(@Param("name") String name);
-//
-//    @Query(value = "SELECT * FROM students WHERE age = :age ORDER BY name ASC", nativeQuery = true)
-//    List<Student> findByAge(@Param("age") Integer age);
-
 
 }

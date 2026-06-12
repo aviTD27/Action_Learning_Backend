@@ -67,13 +67,13 @@ public class StudentControllerTest {
 
     @Test
     void testGetAllStudents() {
-        when(studentService.getAll()).thenReturn(List.of(res));
+        when(studentService.getAll(null)).thenReturn(List.of(res));
 
-        ResponseEntity<List<StudentResponse>> response = studentController.getAll();
+        ResponseEntity<List<StudentResponse>> response = studentController.getAll(null);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(1, response.getBody().size());
-        verify(studentService, times(1)).getAll();
+        verify(studentService, times(1)).getAll(null);
     }
 
     @Test

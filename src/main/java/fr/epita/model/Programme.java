@@ -27,11 +27,12 @@ public class Programme {
     @Column(nullable = false)
     private String description;
 
-    @OneToMany(mappedBy = "programme")
+    @ManyToMany(mappedBy = "programmes")
     @JsonIgnore
     private List<Lecturer> lecturers;
 
-
-    // TODO Will need to link to university
+    @ManyToOne
+    @JoinColumn(name = "university_id")
+    private University university;
 
 }

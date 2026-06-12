@@ -22,12 +22,20 @@ public class ProgrammeController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ProgrammeResponse>> getAll() {
-        return ResponseEntity.ok(programmeService.getAll());
+    public ResponseEntity<List<ProgrammeResponse>> getAll(
+            @RequestParam(required = false) Long universityId) {
+        return ResponseEntity.ok(programmeService.getAll(universityId));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ProgrammeResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(programmeService.getById(id));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ProgrammeResponse> update(
+            @PathVariable Long id,
+            @RequestBody CreateProgrammeRequest request) {
+        return ResponseEntity.ok(programmeService.update(id, request));
     }
 }

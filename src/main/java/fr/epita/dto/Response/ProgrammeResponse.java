@@ -9,4 +9,6 @@ public class ProgrammeResponse {
     private String name;
     private String code;
     private String description;
+    private Long universityId;
+    private String universityName;
 }

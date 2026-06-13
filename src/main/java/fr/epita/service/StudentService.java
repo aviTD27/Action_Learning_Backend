@@ -1,54 +1,122 @@
 package fr.epita.service;
 
+import fr.epita.dto.Request.CreateStudentRequest;
+import fr.epita.dto.Response.StudentResponse;
+import fr.epita.enums.StudentStatus;
+import fr.epita.model.Cohort;
+import fr.epita.model.Programme;
 import fr.epita.model.Student;
+import fr.epita.repository.CohortRepository;
+import fr.epita.repository.ProgrammeRepository;
 import fr.epita.repository.StudentRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
-import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class StudentService {
 
-    @Autowired
-    private StudentRepository studentRepository;
+    private final StudentRepository studentRepository;
+    private final CohortRepository cohortRepository;
+    private final ProgrammeRepository programmeRepository;
 
-    public Student create(Student student) {
-        return studentRepository.save(student);
+    public List<StudentResponse> getAll(Long universityId) {
+        List<Student> students = (universityId != null)
+                ? studentRepository.findByProgramme_UniversityId(universityId)
+                : studentRepository.findAll();
+        return students.stream()
+                .map(this::toResponse)
+                .toList();
     }
 
-    public Optional<Student> getById(Long id) {
-        return studentRepository.findById(id);
+    public List<StudentResponse> getByCohort(Long cohortId) {
+        return studentRepository.findByCohortId(cohortId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
-    public List<Student> getAll() {
-        return studentRepository.findAll();
+    @Transactional
+    public StudentResponse create(CreateStudentRequest request) {
+
+        if (studentRepository.existsByEmail(request.getEmail()))
+            throw new IllegalStateException("Email already exists");
+
+        if (studentRepository.existsByStudentRef(request.getStudentRef()))
+            throw new IllegalStateException("Student reference already exists");
+
+        Cohort cohort = cohortRepository.findById(request.getCohortId())
+                .orElseThrow(() -> new EntityNotFoundException("Cohort not found"));
+
+        Programme programme = programmeRepository.findById(request.getProgrammeId())
+                .orElseThrow(() -> new EntityNotFoundException("Programme not found"));
+
+        Student student = Student.builder()
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .email(request.getEmail())
+                .password(request.getPassword())
+                .studentRef(request.getStudentRef())
+                .programme(programme)
+                .status(request.getStatus())
+                .cohort(cohort)
+                .build();
+
+        return toResponse(studentRepository.save(student));
     }
 
-    public Student update(Student student) {
-        if (student.getId() == null || student.getId() <= 0) {
-            throw new IllegalArgumentException("Cannot update student without valid ID");
+    @Transactional
+    public StudentResponse update(Long id, CreateStudentRequest request) {
+
+        Student student = studentRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Student not found"));
+
+        student.setFirstName(request.getFirstName());
+        student.setLastName(request.getLastName());
+        student.setEmail(request.getEmail());
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            student.setPassword(request.getPassword());
         }
-        return studentRepository.save(student);
+        student.setStudentRef(request.getStudentRef());
+        student.setStatus(request.getStatus());
+
+        Programme programme = programmeRepository.findById(request.getProgrammeId())
+                .orElseThrow(() -> new EntityNotFoundException("Programme not found"));
+        student.setProgramme(programme);
+
+        if (request.getCohortId() != null) {
+            Cohort cohort = cohortRepository.findById(request.getCohortId())
+                    .orElseThrow(() -> new RuntimeException("Cohort not found"));
+            student.setCohort(cohort);
+        }
+
+        return toResponse(studentRepository.save(student));
     }
 
-    public void delete(Long id) {
-        studentRepository.deleteById(id);
+    @Transactional
+    public void deactivate(Long id) {
+        Student student = studentRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Student not found"));
+
+        student.setStatus(StudentStatus.INACTIVE);
+        studentRepository.save(student);
     }
 
-    public void deleteAll() {
-        studentRepository.deleteAll();
+    private StudentResponse toResponse(Student student) {
+        StudentResponse studentResponse = new StudentResponse();
+        studentResponse.setId(student.getId());
+        studentResponse.setFirstName(student.getFirstName());
+        studentResponse.setLastName(student.getLastName());
+        studentResponse.setEmail(student.getEmail());
+        studentResponse.setStudentRef(student.getStudentRef());
+        studentResponse.setProgrammeId(student.getProgramme().getId());
+        studentResponse.setProgrammeName(student.getProgramme().getName());
+        studentResponse.setStatus(student.getStatus());
+        studentResponse.setCohortId(student.getCohort() != null ? student.getCohort().getId() : null);
+        return studentResponse;
     }
 
-    public Optional<Student> findByEmail(String email) {
-        return studentRepository.findByEmail(email);
-    }
-
-    public List<Student> findByName(String name) {
-        return studentRepository.findByName(name);
-    }
-
-    public List<Student> findByAge(int age) {
-        return studentRepository.findByAge(age);
-    }
 }

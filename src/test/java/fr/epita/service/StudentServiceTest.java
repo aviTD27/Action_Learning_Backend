@@ -1,6 +1,13 @@
 package fr.epita.service;
 
+import fr.epita.dto.Request.CreateStudentRequest;
+import fr.epita.dto.Response.StudentResponse;
+import fr.epita.enums.StudentStatus;
+import fr.epita.model.Cohort;
+import fr.epita.model.Programme;
 import fr.epita.model.Student;
+import fr.epita.repository.CohortRepository;
+import fr.epita.repository.ProgrammeRepository;
 import fr.epita.repository.StudentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,9 +15,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -18,125 +24,98 @@ import static org.mockito.Mockito.*;
 public class StudentServiceTest {
 
     @Mock
-    private StudentRepository studentRepository;
+    private StudentRepository studentRepo;
+
+    @Mock
+    private CohortRepository cohortRepo;
+
+    @Mock
+    private ProgrammeRepository programmeRepo;
 
     @InjectMocks
     private StudentService studentService;
 
+    private CreateStudentRequest req;
     private Student student;
+    private Cohort cohort;
+    private Programme programme;
 
     @BeforeEach
-    public void setUp() {
+    void setUp() {
         MockitoAnnotations.openMocks(this);
-        student = new Student.Builder()
-                .setName("Jordy")
-                .setSurname("Meye")
-                .setEmail("jordy@outlook.com")
-                .setAge(28)
-                .setAddress("789 Pine Road")
+
+        programme = new Programme();
+        programme.setId(1L);
+        programme.setName("MSc SE");
+
+        cohort = new Cohort();
+        cohort.setId(10L);
+
+        req = new CreateStudentRequest();
+        req.setFirstName("Alice");
+        req.setLastName("Johnson");
+        req.setEmail("alice.johnson@gmail.com");
+        req.setPassword("Pass123");
+        req.setStudentRef("STU-2025F-001");
+        req.setProgrammeId(1L);
+        req.setStatus(StudentStatus.ACTIVE);
+        req.setCohortId(10L);
+
+        student = Student.builder()
+                .id(1L)
+                .firstName("Alice")
+                .lastName("Johnson")
+                .email("alice.johnson@gmail.com")
+                .password("Pass123")
+                .studentRef("STU-2025F-001")
+                .programme(programme)
+                .status(StudentStatus.ACTIVE)
+                .cohort(cohort)
                 .build();
     }
 
     @Test
-    public void testCreateStudent() {
-        when(studentRepository.save(student)).thenReturn(student);
-        
-        Student createdStudent = studentService.create(student);
-        
-        assertNotNull(createdStudent);
-        assertEquals("Jordy", createdStudent.getName());
-        verify(studentRepository, times(1)).save(student);
+    void testCreateStudent() {
+        when(studentRepo.existsByEmail(req.getEmail())).thenReturn(false);
+        when(studentRepo.existsByStudentRef(req.getStudentRef())).thenReturn(false);
+        when(cohortRepo.findById(10L)).thenReturn(Optional.of(cohort));
+        when(programmeRepo.findById(1L)).thenReturn(Optional.of(programme));
+        when(studentRepo.save(any(Student.class))).thenReturn(student);
+
+        StudentResponse res = studentService.create(req);
+
+        assertEquals("Alice", res.getFirstName());
+        assertEquals(1L, res.getProgrammeId());
+        verify(studentRepo, times(1)).save(any(Student.class));
     }
 
     @Test
-    public void testGetStudentById() {
-        Long id = 1L;
-        student.setId(id);
-        when(studentRepository.findById(id)).thenReturn(Optional.of(student));
-        
-        Optional<Student> foundStudent = studentService.getById(id);
-        
-        assertTrue(foundStudent.isPresent());
-        assertEquals("Jordy", foundStudent.get().getName());
-        verify(studentRepository, times(1)).findById(id);
+    void testGetAllStudents() {
+        when(studentRepo.findAll()).thenReturn(List.of(student));
+
+        List<StudentResponse> res = studentService.getAll(null);
+
+        assertEquals(1, res.size());
     }
 
     @Test
-    public void testGetAllStudents() {
-        List<Student> students = Arrays.asList(student);
-        when(studentRepository.findAll()).thenReturn(students);
-        
-        List<Student> result = studentService.getAll();
-        
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        verify(studentRepository, times(1)).findAll();
+    void testUpdateStudent() {
+        when(studentRepo.findById(1L)).thenReturn(Optional.of(student));
+        when(programmeRepo.findById(1L)).thenReturn(Optional.of(programme));
+        when(cohortRepo.findById(10L)).thenReturn(Optional.of(cohort));
+        when(studentRepo.save(any(Student.class))).thenReturn(student);
+
+        StudentResponse res = studentService.update(1L, req);
+
+        assertEquals("Alice", res.getFirstName());
     }
 
     @Test
-    public void testDeleteStudent() {
-        Long id = 1L;
-        studentService.delete(id);
-        
-        verify(studentRepository, times(1)).deleteById(id);
+    void testDeactivateStudent() {
+        when(studentRepo.findById(1L)).thenReturn(Optional.of(student));
+
+        studentService.deactivate(1L);
+
+        verify(studentRepo, times(1)).save(any(Student.class));
     }
-
-    @Test
-    public void testFindByEmail() {
-        when(studentRepository.findByEmail("jordy@outlook.com")).thenReturn(Optional.of(student));
-        
-        Optional<Student> foundStudent = studentService.findByEmail("jordy@outlook.com");
-        
-        assertTrue(foundStudent.isPresent());
-        assertEquals("jordy@outlook.com", foundStudent.get().getEmail());
-    }
-
-    @Test
-    public void testFindByName() {
-        List<Student> students = Arrays.asList(student);
-        when(studentRepository.findByName("Jordy")).thenReturn(students);
-        
-        List<Student> result = studentService.findByName("Jordy");
-        
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        verify(studentRepository, times(1)).findByName("Jordy");
-    }
-
-    @Test
-    public void testFindByAge() {
-        List<Student> students = Arrays.asList(student);
-        when(studentRepository.findByAge(28)).thenReturn(students);
-        
-        List<Student> result = studentService.findByAge(28);
-        
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        verify(studentRepository, times(1)).findByAge(28);
-    }
-
-    @Test
-    public void testUpdateStudent() {
-        student.setId(1L);
-        when(studentRepository.save(student)).thenReturn(student);
-        
-        Student updatedStudent = studentService.update(student);
-        
-        assertNotNull(updatedStudent);
-        assertEquals("Jordy", updatedStudent.getName());
-        verify(studentRepository, times(1)).save(student);
-    }
-
-    @Test
-    public void testUpdateStudentWithoutId() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            studentService.update(student);
-        });
-    }
-
-    @Test
-    public void testDeleteAll() {
-        studentService.deleteAll();
-        verify(studentRepository, times(1)).deleteAll();
-    }}
-
+}

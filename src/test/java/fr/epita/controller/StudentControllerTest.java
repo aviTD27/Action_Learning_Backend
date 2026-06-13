@@ -1,6 +1,8 @@
 package fr.epita.controller;
 
-import fr.epita.model.Student;
+import fr.epita.dto.Request.CreateStudentRequest;
+import fr.epita.dto.Response.StudentResponse;
+import fr.epita.enums.StudentStatus;
 import fr.epita.service.StudentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,9 +12,7 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -25,180 +25,86 @@ public class StudentControllerTest {
     @InjectMocks
     private StudentController studentController;
 
-    private Student student;
+    private CreateStudentRequest req;
+    private StudentResponse res;
 
     @BeforeEach
-    public void setUp() {
+    void setUp() {
         MockitoAnnotations.openMocks(this);
-        student = new Student("Jordy", "Meye", "jordy@outlook.com", 28, "789 Pine Road");
-        student.setId(1L);
+
+        req = new CreateStudentRequest();
+        req.setFirstName("Alice");
+        req.setLastName("Johnson");
+        req.setEmail("alice.johnson@gmail.com");
+        req.setPassword("Pass123");
+        req.setStudentRef("STU-2025F-001");
+        req.setProgrammeId(1L);
+        req.setStatus(StudentStatus.ACTIVE);
+        req.setCohortId(10L);
+
+        res = new StudentResponse();
+        res.setId(1L);
+        res.setFirstName("Alice");
+        res.setLastName("Johnson");
+        res.setEmail("alice.johnson@gmail.com");
+        res.setStudentRef("STU-2025F-001");
+        res.setProgrammeId(1L);
+        res.setProgrammeName("MSc SE");
+        res.setStatus(StudentStatus.ACTIVE);
+        res.setCohortId(10L);
     }
 
     @Test
-    public void testGetAllStudents_Success() {
-        List<Student> students = Arrays.asList(student);
-        when(studentService.getAll()).thenReturn(students);
+    void testCreateStudent() {
+        when(studentService.create(req)).thenReturn(res);
 
-        ResponseEntity<List<Student>> response = studentController.getAllStudents();
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(1, response.getBody().size());
-        verify(studentService, times(1)).getAll();
-    }
-
-    @Test
-    public void testGetAllStudents_Empty() {
-        when(studentService.getAll()).thenReturn(Arrays.asList());
-
-        ResponseEntity<List<Student>> response = studentController.getAllStudents();
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(0, response.getBody().size());
-        verify(studentService, times(1)).getAll();
-    }
-
-    @Test
-    public void testGetStudentById_Found() {
-        when(studentService.getById(1L)).thenReturn(Optional.of(student));
-
-        ResponseEntity<Student> response = studentController.getStudentById(1L);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals("Jordy", response.getBody().getName());
-        verify(studentService, times(1)).getById(1L);
-    }
-
-    @Test
-    public void testGetStudentById_NotFound() {
-        when(studentService.getById(999L)).thenReturn(Optional.empty());
-
-        ResponseEntity<Student> response = studentController.getStudentById(999L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verify(studentService, times(1)).getById(999L);
-    }
-
-    @Test
-    public void testCreateStudent_Success() {
-        Student newStudent = new Student("Jordy", "Meye", "jordy@outlook.com", 28, "789 Pine Road");
-        when(studentService.create(any(Student.class))).thenReturn(newStudent);
-
-        ResponseEntity<Student> response = studentController.createStudent(newStudent);
+        ResponseEntity<StudentResponse> response = studentController.create(req);
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertEquals("Jordy", response.getBody().getName());
-        verify(studentService, times(1)).create(any(Student.class));
+        assertEquals("Alice", response.getBody().getFirstName());
+        verify(studentService, times(1)).create(req);
     }
 
     @Test
-    public void testUpdateStudent_Success() {
-        student.setName("Updated Jordy");
-        when(studentService.getById(1L)).thenReturn(Optional.of(student));
-        when(studentService.update(any(Student.class))).thenReturn(student);
+    void testGetAllStudents() {
+        when(studentService.getAll(null)).thenReturn(List.of(res));
 
-        ResponseEntity<Student> response = studentController.updateStudent(1L, student);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals("Updated Jordy", response.getBody().getName());
-        verify(studentService, times(1)).getById(1L);
-        verify(studentService, times(1)).update(any(Student.class));
-    }
-
-    @Test
-    public void testUpdateStudent_NotFound() {
-        when(studentService.getById(999L)).thenReturn(Optional.empty());
-
-        ResponseEntity<Student> response = studentController.updateStudent(999L, student);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verify(studentService, times(1)).getById(999L);
-    }
-
-    @Test
-    public void testDeleteStudent_Success() {
-        when(studentService.getById(1L)).thenReturn(Optional.of(student));
-
-        ResponseEntity<Void> response = studentController.deleteStudent(1L);
-
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(studentService, times(1)).getById(1L);
-        verify(studentService, times(1)).delete(1L);
-    }
-
-    @Test
-    public void testDeleteStudent_NotFound() {
-        when(studentService.getById(999L)).thenReturn(Optional.empty());
-
-        ResponseEntity<Void> response = studentController.deleteStudent(999L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verify(studentService, times(1)).getById(999L);
-    }
-
-    @Test
-    public void testGetStudentByEmail_Found() {
-        when(studentService.findByEmail("jordy@outlook.com")).thenReturn(Optional.of(student));
-
-        ResponseEntity<Student> response = studentController.getStudentByEmail("jordy@outlook.com");
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals("jordy@outlook.com", response.getBody().getEmail());
-        verify(studentService, times(1)).findByEmail("jordy@outlook.com");
-    }
-
-    @Test
-    public void testGetStudentByEmail_NotFound() {
-        when(studentService.findByEmail("nonexistent@example.com")).thenReturn(Optional.empty());
-
-        ResponseEntity<Student> response = studentController.getStudentByEmail("nonexistent@example.com");
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verify(studentService, times(1)).findByEmail("nonexistent@example.com");
-    }
-
-    @Test
-    public void testGetStudentsByName_Found() {
-        List<Student> students = Arrays.asList(student);
-        when(studentService.findByName("Jordy")).thenReturn(students);
-
-        ResponseEntity<List<Student>> response = studentController.getStudentsByName("Jordy");
+        ResponseEntity<List<StudentResponse>> response = studentController.getAll(null);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(1, response.getBody().size());
-        verify(studentService, times(1)).findByName("Jordy");
+        verify(studentService, times(1)).getAll(null);
     }
 
     @Test
-    public void testGetStudentsByName_Empty() {
-        when(studentService.findByName("NonExistent")).thenReturn(Arrays.asList());
+    void testGetByCohort() {
+        when(studentService.getByCohort(10L)).thenReturn(List.of(res));
 
-        ResponseEntity<List<Student>> response = studentController.getStudentsByName("NonExistent");
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(0, response.getBody().size());
-        verify(studentService, times(1)).findByName("NonExistent");
-    }
-
-    @Test
-    public void testGetStudentsByAge_Found() {
-        List<Student> students = Arrays.asList(student);
-        when(studentService.findByAge(28)).thenReturn(students);
-
-        ResponseEntity<List<Student>> response = studentController.getStudentsByAge(28);
+        ResponseEntity<List<StudentResponse>> response = studentController.getByCohort(10L);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(1, response.getBody().size());
-        verify(studentService, times(1)).findByAge(28);
+        verify(studentService, times(1)).getByCohort(10L);
     }
 
     @Test
-    public void testGetStudentsByAge_Empty() {
-        when(studentService.findByAge(99)).thenReturn(Arrays.asList());
+    void testUpdateStudent() {
+        when(studentService.update(1L, req)).thenReturn(res);
 
-        ResponseEntity<List<Student>> response = studentController.getStudentsByAge(99);
+        ResponseEntity<StudentResponse> response = studentController.update(1L, req);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(0, response.getBody().size());
-        verify(studentService, times(1)).findByAge(99);
+        assertEquals("Alice", response.getBody().getFirstName());
+        verify(studentService, times(1)).update(1L, req);
+    }
+
+    @Test
+    void testDeactivateStudent() {
+        doNothing().when(studentService).deactivate(1L);
+
+        ResponseEntity<Void> response = studentController.deactivate(1L);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(studentService, times(1)).deactivate(1L);
     }
 }

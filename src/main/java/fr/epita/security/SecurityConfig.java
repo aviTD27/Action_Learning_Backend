@@ -31,6 +31,7 @@ public class SecurityConfig {
                 // Auth endpoints are open to all
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/registrations").permitAll()
                 // Everything else requires a valid JWT
                 .anyRequest().authenticated()
             )

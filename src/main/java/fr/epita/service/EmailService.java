@@ -37,6 +37,28 @@ public class EmailService {
     }
 
     @Async
+    public void sendPlatformAdminWelcomeEmail(String toEmail, String firstName, String tempPassword) {
+        log.info("Sending platform admin welcome email to {}", toEmail);
+        String body = """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2 style="color: #2c3e50;">Welcome — Platform Administrator Account Created</h2>
+                  <p>Dear %s,</p>
+                  <p>A platform administrator account has been created for you on the Action Learning Platform.</p>
+                  <div style="background: #f4f6f7; border-left: 4px solid #2E5F9E; padding: 16px; margin: 24px 0; border-radius: 4px;">
+                    <h3 style="margin: 0 0 12px 0; color: #2c3e50;">Your Login Credentials</h3>
+                    <p style="margin: 4px 0;"><strong>Email:</strong> %s</p>
+                    <p style="margin: 4px 0;"><strong>Temporary Password:</strong>
+                      <code style="background:#fff;padding:2px 6px;border-radius:3px;">%s</code>
+                    </p>
+                  </div>
+                  <p style="color: #e74c3c;"><strong>Important:</strong> Please log in and change your password immediately.</p>
+                  <p style="color: #7f8c8d; font-size: 12px; margin-top: 32px;">This is an automated message. Please do not reply.</p>
+                </div>
+                """.formatted(firstName, toEmail, tempPassword);
+        send(toEmail, "Your Action Learning Platform Admin Account", body);
+    }
+
+    @Async
     public void sendRejectionEmail(String toEmail, String firstName, String reason) {
         log.info("Sending rejection email to {}", toEmail);
         send(toEmail,

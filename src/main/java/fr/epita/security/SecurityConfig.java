@@ -32,6 +32,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/registrations").permitAll()
+                // Super-admin endpoints — ROLE_SUPER_ADMIN only
+                .requestMatchers("/api/super-admin/**").hasRole("SUPER_ADMIN")
                 // Everything else requires a valid JWT
                 .anyRequest().authenticated()
             )

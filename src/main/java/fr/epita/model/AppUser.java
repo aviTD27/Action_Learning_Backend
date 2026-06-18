@@ -37,4 +37,14 @@ public class AppUser {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, columnDefinition = "VARCHAR(50)")
     private Role role;
+
+    /** false = account can log in; true = login blocked by admin */
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean blocked = false;
+
+    /** false = visible and active; true = soft-deleted (hidden from UI, preserved in DB) */
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean deleted = false;
 }

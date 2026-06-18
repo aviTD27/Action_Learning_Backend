@@ -23,6 +23,10 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .map(u -> new User(
                         u.getEmail(),
                         u.getPassword(),
+                        !u.isDeleted(),             // enabled  — deleted users cannot log in
+                        true,                        // accountNonExpired
+                        true,                        // credentialsNonExpired
+                        !u.isBlocked(),              // accountNonLocked — blocked users cannot log in
                         List.of(new SimpleGrantedAuthority(u.getRole().name()))
                 ))
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));

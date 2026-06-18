@@ -1,13 +1,16 @@
 package fr.epita.controller;
 
+import fr.epita.dto.Request.ChangePasswordRequest;
 import fr.epita.dto.Request.LoginRequest;
 import fr.epita.dto.Request.RegisterRequest;
 import fr.epita.dto.Response.AuthResponse;
+import fr.epita.model.AppUser;
 import fr.epita.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -25,5 +28,13 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @PatchMapping("/change-password")
+    public ResponseEntity<Void> changePassword(
+            @AuthenticationPrincipal AppUser currentUser,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(currentUser.getEmail(), request);
+        return ResponseEntity.ok().build();
     }
 }

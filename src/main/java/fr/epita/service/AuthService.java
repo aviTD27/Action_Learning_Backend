@@ -1,5 +1,6 @@
 package fr.epita.service;
 
+import fr.epita.dto.Request.ChangePasswordRequest;
 import fr.epita.dto.Request.LoginRequest;
 import fr.epita.dto.Request.RegisterRequest;
 import fr.epita.dto.Response.AuthResponse;
@@ -54,6 +55,19 @@ public class AuthService {
         }
 
         return new AuthResponse(jwtUtil.generateToken(user.getEmail(), user.getRole()));
+    }
+
+    @Transactional
+    public void changePassword(String email, ChangePasswordRequest request) {
+        AppUser user = appUserRepository.findByEmail(email)
+                .orElseThrow(() -> new BadCredentialsException("User not found"));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new BadCredentialsException("Current password is incorrect");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        appUserRepository.save(user);
     }
 
     /**

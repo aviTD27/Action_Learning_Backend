@@ -25,7 +25,7 @@ public class AppUser {
     @Column(nullable = false)
     private String surname;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private LocalDate dateOfBirth;
 
     @Column(nullable = false, unique = true)

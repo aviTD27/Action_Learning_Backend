@@ -20,10 +20,13 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final StudentRepository studentRepository;
+    private final EmailService emailService;
 
     @Transactional
     public void notifyCohort(Submission submission, NotificationType type, String message) {
         List<Student> students = studentRepository.findByCohortId(submission.getCohort().getId());
+
+        // 1. In-platform notification for each student.
         List<Notification> notifications = students.stream()
                 .map(student -> Notification.builder()
                         .student(student)
@@ -34,6 +37,14 @@ public class NotificationService {
                         .build())
                 .toList();
         notificationRepository.saveAll(notifications);
+
+        // 2. Email each student 
+        String subject = "Action Learning Platform — " + submission.getTitle();
+        for (Student student : students) {
+            if (student.getEmail() != null && !student.getEmail().isBlank()) {
+                emailService.sendNotificationEmail(student.getEmail(), student.getFirstName(), subject, message);
+            }
+        }
     }
 
     public List<NotificationResponse> getForStudent(Long studentId) {

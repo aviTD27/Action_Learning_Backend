@@ -61,6 +61,13 @@ public class EmailService {
              buildRejectionBody(firstName, reason));
     }
 
+    /** Sent to a student when a lecturer notifies the cohort  */
+    @Async
+    public void sendNotificationEmail(String toEmail, String firstName, String subject, String message) {
+        log.info("Sending notification email to {}", toEmail);
+        send(toEmail, subject, buildNotificationBody(firstName, message));
+    }
+
     private void send(String to, String subject, String htmlBody) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -117,6 +124,13 @@ public class EmailService {
               + reasonSection
               + "<p>If you believe this decision was made in error or would like to reapply, "
               + "please contact our support team.</p>");
+    }
+
+    private String buildNotificationBody(String firstName, String message) {
+        return layout("A Notification from Your Lecturer",
+                greeting(firstName)
+              + "<p>" + message + "</p>"
+              + "<p>Log in to the Action Learning Platform to view the details.</p>");
     }
 
     // ---- Shared building blocks (edit once, every email updates) ----

@@ -4,5 +4,6 @@ public enum Role {
     ROLE_SUPER_ADMIN,
     ROLE_PLATFORM_ADMIN,
     ROLE_ADMIN,
+    ROLE_LECTURER,
     ROLE_STUDENT
 }

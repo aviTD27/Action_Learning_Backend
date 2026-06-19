@@ -3,6 +3,7 @@ package fr.epita.model;
 import fr.epita.enums.Role;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDate;
 
@@ -40,11 +41,13 @@ public class AppUser {
 
     /** false = account can log in; true = login blocked by admin */
     @Builder.Default
+    @ColumnDefault("false")
     @Column(nullable = false)
     private boolean blocked = false;
 
     /** false = visible and active; true = soft-deleted (hidden from UI, preserved in DB) */
     @Builder.Default
+    @ColumnDefault("false")
     @Column(nullable = false)
     private boolean deleted = false;
 }

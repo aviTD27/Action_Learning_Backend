@@ -39,23 +39,18 @@ public class EmailService {
     @Async
     public void sendPlatformAdminWelcomeEmail(String toEmail, String firstName, String tempPassword) {
         log.info("Sending platform admin welcome email to {}", toEmail);
-        String body = """
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <h2 style="color: #2c3e50;">Welcome — Platform Administrator Account Created</h2>
-                  <p>Dear %s,</p>
-                  <p>A platform administrator account has been created for you on the Action Learning Platform.</p>
-                  <div style="background: #f4f6f7; border-left: 4px solid #2E5F9E; padding: 16px; margin: 24px 0; border-radius: 4px;">
-                    <h3 style="margin: 0 0 12px 0; color: #2c3e50;">Your Login Credentials</h3>
-                    <p style="margin: 4px 0;"><strong>Email:</strong> %s</p>
-                    <p style="margin: 4px 0;"><strong>Temporary Password:</strong>
-                      <code style="background:#fff;padding:2px 6px;border-radius:3px;">%s</code>
-                    </p>
-                  </div>
-                  <p style="color: #e74c3c;"><strong>Important:</strong> Please log in and change your password immediately.</p>
-                  <p style="color: #7f8c8d; font-size: 12px; margin-top: 32px;">This is an automated message. Please do not reply.</p>
-                </div>
-                """.formatted(firstName, toEmail, tempPassword);
-        send(toEmail, "Your Action Learning Platform Admin Account", body);
+        send(toEmail,
+             "Your Action Learning Platform Admin Account",
+             buildPlatformAdminBody(firstName, toEmail, tempPassword));
+    }
+
+    @Async
+    public void sendAccountCreatedEmail(String toEmail, String firstName, String loginEmail,
+                                        String tempPassword, String roleLabel) {
+        log.info("Sending {} welcome email to {} (login: {})", roleLabel, toEmail, loginEmail);
+        send(toEmail,
+             "Your Action Learning Platform Account Is Ready",
+             buildAccountCreatedBody(firstName, loginEmail, tempPassword, roleLabel));
     }
 
     @Async
@@ -82,54 +77,81 @@ public class EmailService {
         }
     }
 
+    // ---- One named builder per email type; all compose from the shared blocks below. ----
+
     private String buildApprovalBody(String firstName, String platformEmail, String tempPassword) {
-        return """
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <h2 style="color: #2c3e50;">Welcome to the Action Learning Platform</h2>
-                  <p>Dear %s,</p>
-                  <p>Your university registration request has been <strong style="color: #27ae60;">approved</strong>.
-                     Your administrator account has been created and is ready to use.</p>
+        return layout("Welcome to the Action Learning Platform",
+                greeting(firstName)
+              + "<p>Your university registration request has been "
+              + "<strong style=\"color:#27ae60;\">approved</strong>. Your administrator account "
+              + "has been created and is ready to use.</p>"
+              + credentialsBlock(platformEmail, tempPassword)
+              + "<p>As a university administrator you can now manage your institution's "
+              + "programmes, cohorts, lecturers, and students.</p>");
+    }
 
-                  <div style="background: #f4f6f7; border-left: 4px solid #27ae60; padding: 16px; margin: 24px 0; border-radius: 4px;">
-                    <h3 style="margin: 0 0 12px 0; color: #2c3e50;">Your Login Credentials</h3>
-                    <p style="margin: 4px 0;"><strong>Platform Email (login):</strong> %s</p>
-                    <p style="margin: 4px 0;"><strong>Temporary Password:</strong>
-                      <code style="background:#fff;padding:2px 6px;border-radius:3px;">%s</code>
-                    </p>
-                  </div>
+    private String buildAccountCreatedBody(String firstName, String loginEmail, String tempPassword, String roleLabel) {
+        return layout("Welcome to the Action Learning Platform",
+                greeting(firstName)
+              + "<p>A <strong>" + roleLabel + "</strong> account has been created for you on the "
+              + "Action Learning Platform and is ready to use.</p>"
+              + credentialsBlock(loginEmail, tempPassword));
+    }
 
-                  <p style="color: #e74c3c;">
-                    <strong>Important:</strong> Please log in and change your password immediately
-                    using the <em>Change Password</em> option in your profile.
-                  </p>
-
-                  <p>As a university administrator you can now manage your institution's
-                     programmes, cohorts, lecturers, and students.</p>
-
-                  <p style="color: #7f8c8d; font-size: 12px; margin-top: 32px;">
-                    This is an automated message. Please do not reply to this email.
-                  </p>
-                </div>
-                """.formatted(firstName, platformEmail, tempPassword);
+    private String buildPlatformAdminBody(String firstName, String loginEmail, String tempPassword) {
+        return layout("Welcome — Platform Administrator Account Created",
+                greeting(firstName)
+              + "<p>A platform administrator account has been created for you on the "
+              + "Action Learning Platform.</p>"
+              + credentialsBlock(loginEmail, tempPassword));
     }
 
     private String buildRejectionBody(String firstName, String reason) {
         String reasonSection = (reason != null && !reason.isBlank())
                 ? "<p><strong>Reason:</strong> " + reason + "</p>"
                 : "";
+        return layout("Update on Your Registration Request",
+                greeting(firstName)
+              + "<p>After reviewing your request, we regret to inform you that your university "
+              + "registration request has been <strong style=\"color:#e74c3c;\">declined</strong>.</p>"
+              + reasonSection
+              + "<p>If you believe this decision was made in error or would like to reapply, "
+              + "please contact our support team.</p>");
+    }
+
+    // ---- Shared building blocks (edit once, every email updates) ----
+
+    /** Wraps inner HTML in the shared ALC email shell: heading at the top, footer at the bottom. */
+    private String layout(String heading, String innerHtml) {
         return """
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <h2 style="color: #2c3e50;">Update on Your Registration Request</h2>
-                  <p>Dear %s,</p>
-                  <p>After reviewing your request, we regret to inform you that your university
-                     registration request has been <strong style="color: #e74c3c;">declined</strong>.</p>
+                  <h2 style="color: #2c3e50;">%s</h2>
                   %s
-                  <p>If you believe this decision was made in error or would like to reapply,
-                     please contact our support team.</p>
                   <p style="color: #7f8c8d; font-size: 12px; margin-top: 32px;">
                     This is an automated message. Please do not reply to this email.
                   </p>
                 </div>
-                """.formatted(firstName, reasonSection);
+                """.formatted(heading, innerHtml);
+    }
+
+    private String greeting(String firstName) {
+        return "<p>Dear " + firstName + ",</p>";
+    }
+
+    /** Login-credentials box plus the mandatory "change your password" notice. */
+    private String credentialsBlock(String loginEmail, String tempPassword) {
+        return """
+                <div style="background: #f4f6f7; border-left: 4px solid #2E5F9E; padding: 16px; margin: 24px 0; border-radius: 4px;">
+                  <h3 style="margin: 0 0 12px 0; color: #2c3e50;">Your Login Credentials</h3>
+                  <p style="margin: 4px 0;"><strong>Login Email:</strong> %s</p>
+                  <p style="margin: 4px 0;"><strong>Temporary Password:</strong>
+                    <code style="background:#fff;padding:2px 6px;border-radius:3px;">%s</code>
+                  </p>
+                </div>
+                <p style="color: #e74c3c;">
+                  <strong>Important:</strong> Please log in and change your password immediately
+                  using the <em>Change Password</em> option in your profile.
+                </p>
+                """.formatted(loginEmail, tempPassword);
     }
 }

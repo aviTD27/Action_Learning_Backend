@@ -42,7 +42,7 @@ public class LecturerService {
     }
 
     @Transactional
-    public LecturerResponse create(CreateLecturerRequest request) {
+    public LecturerResponse create(CreateLecturerRequest request, Long universityId) {
         if (lecturerRepository.existsByLecturerRef(request.getLecturerRef())) {
             throw new IllegalStateException("Lecturer reference already exists");
         }
@@ -61,6 +61,7 @@ public class LecturerService {
                 .email(email)
                 .password(hashed)
                 .role(Role.ROLE_LECTURER)
+                .universityId(universityId)
                 .build();
         appUserRepository.save(login);
 

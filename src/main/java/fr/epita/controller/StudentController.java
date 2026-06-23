@@ -2,10 +2,12 @@ package fr.epita.controller;
 
 import fr.epita.dto.Request.CreateStudentRequest;
 import fr.epita.dto.Response.StudentResponse;
+import fr.epita.model.AppUser;
 import fr.epita.service.StudentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -19,8 +21,11 @@ public class StudentController {
 
     // CREATE
     @PostMapping
-    public ResponseEntity<StudentResponse> create(@RequestBody CreateStudentRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(studentService.create(req));
+    public ResponseEntity<StudentResponse> create(
+            @RequestBody CreateStudentRequest req,
+            @AuthenticationPrincipal AppUser currentUser) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(studentService.create(req, currentUser.getUniversityId()));
     }
 
     // GET ALL

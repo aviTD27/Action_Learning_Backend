@@ -52,7 +52,7 @@ public class StudentService {
     }
 
     @Transactional
-    public StudentResponse create(CreateStudentRequest request) {
+    public StudentResponse create(CreateStudentRequest request, Long universityId) {
 
         String email = request.getEmail().trim().toLowerCase();
 
@@ -80,6 +80,7 @@ public class StudentService {
                 .email(email)
                 .password(hashed)
                 .role(Role.ROLE_STUDENT)
+                .universityId(universityId)
                 .build();
         appUserRepository.save(login);
 

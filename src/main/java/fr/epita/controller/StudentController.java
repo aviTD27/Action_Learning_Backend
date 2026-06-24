@@ -28,6 +28,12 @@ public class StudentController {
                 .body(studentService.create(req, currentUser.getUniversityId()));
     }
 
+    // GET OWN PROFILE
+    @GetMapping("/me")
+    public ResponseEntity<StudentResponse> getMyProfile(@AuthenticationPrincipal AppUser currentUser) {
+        return ResponseEntity.ok(studentService.getMyProfile(currentUser.getEmail()));
+    }
+
     // GET ALL
     @GetMapping
     public ResponseEntity<List<StudentResponse>> getAll(

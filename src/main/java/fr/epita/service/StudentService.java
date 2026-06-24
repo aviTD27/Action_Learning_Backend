@@ -146,6 +146,12 @@ public class StudentService {
         studentRepository.save(student);
     }
 
+    public StudentResponse getMyProfile(String email) {
+        Student student = studentRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Student profile not found"));
+        return toResponse(student);
+    }
+
     private StudentResponse toResponse(Student student) {
         StudentResponse studentResponse = new StudentResponse();
         studentResponse.setId(student.getId());
@@ -157,6 +163,12 @@ public class StudentService {
         studentResponse.setProgrammeName(student.getProgramme().getName());
         studentResponse.setStatus(student.getStatus());
         studentResponse.setCohortId(student.getCohort() != null ? student.getCohort().getId() : null);
+        studentResponse.setCohortName(student.getCohort() != null ? student.getCohort().getName() : null);
+        studentResponse.setUniversityName(
+                student.getProgramme().getUniversity() != null
+                        ? student.getProgramme().getUniversity().getName()
+                        : null
+        );
         return studentResponse;
     }
 

@@ -14,6 +14,8 @@ public class StudentResponse {
     private String programmeName;
     private StudentStatus status;
     private Long cohortId;
+    private String cohortName;
+    private String universityName;
 }
 
 

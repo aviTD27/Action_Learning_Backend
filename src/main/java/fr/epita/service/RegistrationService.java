@@ -102,7 +102,7 @@ public class RegistrationService {
                     .surname(reg.getAdminLastName())
                     .email(platformEmail)
                     .password(passwordEncoder.encode(tempPassword))
-                    .role(Role.ROLE_ADMIN)
+                    .role(Role.ROLE_UNI_ADMIN)
                     .universityId(university.getId())
                     .build();
             appUserRepository.save(admin);

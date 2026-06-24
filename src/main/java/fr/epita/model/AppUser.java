@@ -51,7 +51,7 @@ public class AppUser {
     @Column(nullable = false)
     private boolean deleted = false;
 
-    /** Null for SUPER_ADMIN and PLATFORM_ADMIN; set for ROLE_ADMIN, ROLE_LECTURER, ROLE_STUDENT */
+    /** Null for SUPER_ADMIN and PLATFORM_ADMIN; set for ROLE_UNI_ADMIN, ROLE_LECTURER, ROLE_STUDENT */
     @Column(name = "university_id")
     private Long universityId;
 }

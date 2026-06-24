@@ -72,8 +72,8 @@ public class AuthService {
 
     /**
      * Bootstrap rule:
-     *   - No valid JWT → caller is anonymous → only ROLE_ADMIN may be provisioned.
-     *   - Valid JWT with ROLE_ADMIN → any role the request specifies (defaults to ROLE_STUDENT).
+     *   - No valid JWT → caller is anonymous → only ROLE_UNI_ADMIN may be provisioned.
+     *   - Valid JWT with ROLE_UNI_ADMIN → any role the request specifies (defaults to ROLE_STUDENT).
      */
     private Role resolveRole(Role requested) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -82,16 +82,16 @@ public class AuthService {
                 && auth.isAuthenticated()
                 && auth.getPrincipal() instanceof AppUser
                 && auth.getAuthorities().stream()
-                       .anyMatch(a -> a.getAuthority().equals(Role.ROLE_ADMIN.name()));
+                       .anyMatch(a -> a.getAuthority().equals(Role.ROLE_UNI_ADMIN.name()));
 
         if (callerIsAdmin) {
             return requested != null ? requested : Role.ROLE_STUDENT;
         }
 
-        // Unauthenticated: bootstrap path — only ROLE_ADMIN is permitted
-        if (requested != null && requested != Role.ROLE_ADMIN) {
-            throw new IllegalStateException("Only ROLE_ADMIN can be registered without authentication");
+        // Unauthenticated: bootstrap path — only ROLE_UNI_ADMIN is permitted
+        if (requested != null && requested != Role.ROLE_UNI_ADMIN) {
+            throw new IllegalStateException("Only ROLE_UNI_ADMIN can be registered without authentication");
         }
-        return Role.ROLE_ADMIN;
+        return Role.ROLE_UNI_ADMIN;
     }
 }

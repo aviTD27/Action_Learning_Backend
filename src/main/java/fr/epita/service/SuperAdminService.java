@@ -27,7 +27,7 @@ public class SuperAdminService {
     /** Returns all non-deleted admin users (university admins + platform admins). */
     public List<PlatformAdminResponse> listPlatformAdmins() {
         return appUserRepository.findByRoleInAndDeletedFalse(
-                        List.of(Role.ROLE_ADMIN, Role.ROLE_PLATFORM_ADMIN))
+                        List.of(Role.ROLE_UNI_ADMIN, Role.ROLE_PLATFORM_ADMIN))
                 .stream()
                 .map(this::toResponse)
                 .toList();

@@ -48,6 +48,7 @@ public class UniversityService {
                 .id(university.getId())
                 .name(university.getName())
                 .code(university.getCode())
+                .domain(university.getDomain())
                 .build();
     }
 }

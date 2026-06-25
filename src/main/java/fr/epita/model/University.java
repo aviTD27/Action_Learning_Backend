@@ -25,6 +25,9 @@ public class University {
     @Column(nullable = false, unique = true)
     private String code;
 
+    @Column
+    private String domain;
+
     @OneToMany(mappedBy = "university")
     @JsonIgnore
     private List<Programme> programmes;

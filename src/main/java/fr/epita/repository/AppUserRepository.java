@@ -22,4 +22,7 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     /** Fetch a single non-deleted user by id (used for block/unblock/delete). */
     Optional<AppUser> findByIdAndDeletedFalse(Long id);
+
+    /** Find the first admin user for a given university (used to derive the university email domain). */
+    Optional<AppUser> findFirstByUniversityIdAndRole(Long universityId, Role role);
 }

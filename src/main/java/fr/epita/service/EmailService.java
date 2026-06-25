@@ -160,7 +160,7 @@ public class EmailService {
                   <p style="margin: 4px 0;"><strong>Login Email:</strong> %s</p>
                   <p style="margin: 4px 0;"><strong>Temporary Password:</strong>
                     <code style="background:#fff;padding:2px 6px;border-radius:3px;">%s</code>
-                  </p>
+                  </p>w3
                 </div>
                 <p style="color: #e74c3c;">
                   <strong>Important:</strong> Please log in and change your password immediately

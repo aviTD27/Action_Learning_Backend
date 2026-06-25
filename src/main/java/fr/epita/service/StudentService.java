@@ -2,16 +2,20 @@ package fr.epita.service;
 
 import fr.epita.dto.Request.CreateStudentRequest;
 import fr.epita.dto.Response.StudentResponse;
+import fr.epita.enums.RegistrationStatus;
 import fr.epita.enums.Role;
 import fr.epita.enums.StudentStatus;
 import fr.epita.model.AppUser;
 import fr.epita.model.Cohort;
 import fr.epita.model.Programme;
 import fr.epita.model.Student;
+import fr.epita.model.University;
 import fr.epita.repository.AppUserRepository;
 import fr.epita.repository.CohortRepository;
+import fr.epita.repository.PendingRegistrationRepository;
 import fr.epita.repository.ProgrammeRepository;
 import fr.epita.repository.StudentRepository;
+import fr.epita.repository.UniversityRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +37,8 @@ public class StudentService {
     private final CohortRepository cohortRepository;
     private final ProgrammeRepository programmeRepository;
     private final AppUserRepository appUserRepository;
+    private final UniversityRepository universityRepository;
+    private final PendingRegistrationRepository registrationRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
 
@@ -54,16 +61,8 @@ public class StudentService {
     @Transactional
     public StudentResponse create(CreateStudentRequest request, Long universityId) {
 
-        String email = request.getEmail().trim().toLowerCase();
-
-        if (studentRepository.existsByEmail(email))
-            throw new IllegalStateException("Email already exists");
-
         if (studentRepository.existsByStudentRef(request.getStudentRef()))
             throw new IllegalStateException("Student reference already exists");
-
-        if (appUserRepository.existsByEmail(email))
-            throw new IllegalStateException("An account with this email already exists");
 
         Cohort cohort = cohortRepository.findById(request.getCohortId())
                 .orElseThrow(() -> new EntityNotFoundException("Cohort not found"));
@@ -71,13 +70,17 @@ public class StudentService {
         Programme programme = programmeRepository.findById(request.getProgrammeId())
                 .orElseThrow(() -> new EntityNotFoundException("Programme not found"));
 
+        String domain = resolveDomain(universityId, programme);
+
+        String platformEmail = generatePlatformEmail(request.getFirstName(), request.getLastName(), domain);
+
         String tempPassword = generateTempPassword();
         String hashed = passwordEncoder.encode(tempPassword);
 
         AppUser login = AppUser.builder()
                 .firstName(request.getFirstName())
                 .surname(request.getLastName())
-                .email(email)
+                .email(platformEmail)
                 .password(hashed)
                 .role(Role.ROLE_STUDENT)
                 .universityId(universityId)
@@ -87,7 +90,7 @@ public class StudentService {
         Student student = Student.builder()
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
-                .email(email)
+                .email(platformEmail)
                 .password(hashed)
                 .studentRef(request.getStudentRef())
                 .programme(programme)
@@ -96,9 +99,83 @@ public class StudentService {
                 .build();
         StudentResponse response = toResponse(studentRepository.save(student));
 
-        emailService.sendAccountCreatedEmail(email, request.getFirstName(), email, tempPassword, "Student");
+        String recipient = (request.getPersonalEmail() != null && !request.getPersonalEmail().isBlank())
+                ? request.getPersonalEmail()
+                : platformEmail;
+        emailService.sendAccountCreatedEmail(recipient, request.getFirstName(), platformEmail, tempPassword, "Student");
 
         return response;
+    }
+
+    /**
+     * Resolves the university email domain.
+     * Sources tried in order: university.domain → pending_registration → admin user email.
+     * Every resolved value is sanitized: if it contains '@' (i.e. a full email was stored by mistake),
+     * only the part after the last '@' is kept so we always return a bare domain like "uct.ac.za".
+     */
+    private String resolveDomain(Long universityId, Programme programme) {
+        University university = null;
+
+        if (universityId != null) {
+            university = universityRepository.findById(universityId).orElse(null);
+        }
+        if (university == null && programme.getUniversity() != null) {
+            university = programme.getUniversity();
+        }
+
+        if (university != null && university.getDomain() != null && !university.getDomain().isBlank()) {
+            return extractDomain(university.getDomain());
+        }
+
+        if (university != null) {
+            String domainFromReg = registrationRepository
+                    .findFirstByOrgNameIgnoreCaseAndStatus(university.getName(), RegistrationStatus.APPROVED)
+                    .map(r -> r.getDomain())
+                    .orElse(null);
+            if (domainFromReg != null && !domainFromReg.isBlank()) {
+                return extractDomain(domainFromReg);
+            }
+        }
+
+        // Level 3: every university admin's email is firstname.lastname@domain — extract the suffix.
+        if (universityId != null) {
+            Optional<AppUser> admin = appUserRepository.findFirstByUniversityIdAndRole(universityId, Role.ROLE_ADMIN);
+            if (admin.isPresent()) {
+                String result = extractDomain(admin.get().getEmail());
+                if (!result.isBlank()) return result;
+            }
+        }
+
+        throw new IllegalStateException(
+                "University domain is not configured. Please ensure the university was registered through the platform.");
+    }
+
+    /**
+     * Extracts the bare domain from a value that may be either "uct.ac.za" or a full email "esther.smith@uct.ac.za".
+     * Returns only the part after the last '@', trimmed and lowercased.
+     */
+    private String extractDomain(String raw) {
+        if (raw == null) return "";
+        raw = raw.trim().toLowerCase();
+        int atIdx = raw.lastIndexOf('@');
+        return atIdx >= 0 ? raw.substring(atIdx + 1) : raw;
+    }
+
+    private String generatePlatformEmail(String firstName, String lastName, String domain) {
+        // If a full email was stored as the domain (e.g. "esther.smith@uct.ac.za"), keep only the part after @
+        if (domain.contains("@")) {
+            domain = domain.substring(domain.lastIndexOf('@') + 1);
+        }
+        String base = firstName.toLowerCase().replaceAll("[^a-z0-9]", "")
+                + "."
+                + lastName.toLowerCase().replaceAll("[^a-z0-9]", "");
+        String email = base + "@" + domain;
+        int suffix = 2;
+        while (studentRepository.existsByEmail(email) || appUserRepository.existsByEmail(email)) {
+            email = base + suffix + "@" + domain;
+            suffix++;
+        }
+        return email;
     }
 
     private String generateTempPassword() {
@@ -117,7 +194,9 @@ public class StudentService {
 
         student.setFirstName(request.getFirstName());
         student.setLastName(request.getLastName());
-        student.setEmail(request.getEmail());
+        if (request.getEmail() != null && !request.getEmail().isBlank()) {
+            student.setEmail(request.getEmail());
+        }
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             student.setPassword(request.getPassword());
         }
@@ -171,5 +250,4 @@ public class StudentService {
         );
         return studentResponse;
     }
-
 }

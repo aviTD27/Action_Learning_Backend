@@ -84,7 +84,7 @@ public class RegistrationService {
         String code = deriveCode(reg.getDomain(), reg.getOrgName());
         University university;
         if (!universityRepository.existsByName(reg.getOrgName()) && !universityRepository.existsByCode(code)) {
-            university = universityRepository.save(University.builder().name(reg.getOrgName()).code(code).build());
+            university = universityRepository.save(University.builder().name(reg.getOrgName()).code(code).domain(reg.getDomain()).build());
         } else {
             university = universityRepository.findByName(reg.getOrgName())
                     .orElseThrow(() -> new EntityNotFoundException("University not found"));

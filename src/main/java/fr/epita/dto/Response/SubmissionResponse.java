@@ -24,6 +24,10 @@ public class SubmissionResponse {
     private String allowedFileTypes;
     private int maxAttempts;
     private boolean lateAllowed;
+    private Integer minWordCount;
+    private Integer maxWordCount;
+    private String namingPattern;
+    private String requiredHeadings;
     private String templateFileName;
     private Instant lastNotifiedAt;
     private Instant createdAt;

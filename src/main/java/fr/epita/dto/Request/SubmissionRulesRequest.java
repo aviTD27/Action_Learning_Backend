@@ -12,4 +12,12 @@ public class SubmissionRulesRequest {
     private int maxAttempts;
 
     private boolean lateAllowed;
+
+    private Integer minWordCount;
+
+    private Integer maxWordCount;
+
+    private String namingPattern;
+
+    private String requiredHeadings;
 }

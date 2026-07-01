@@ -1,6 +1,7 @@
 package fr.epita.service;
 
 import fr.epita.dto.Request.CreateSubmissionRequest;
+import fr.epita.dto.Request.SubmissionRulesRequest;
 import fr.epita.dto.Response.SubmissionResponse;
 import fr.epita.enums.CohortStatus;
 import fr.epita.enums.NotificationType;
@@ -126,14 +127,20 @@ public class SubmissionService {
     }
 
     private SubmissionRules toRules(CreateSubmissionRequest request) {
+        SubmissionRulesRequest r = request.getRules();
         return SubmissionRules.builder()
-                .allowedFileTypes(request.getRules().getAllowedFileTypes())
-                .maxAttempts(request.getRules().getMaxAttempts())
-                .lateAllowed(request.getRules().isLateAllowed())
+                .allowedFileTypes(r.getAllowedFileTypes())
+                .maxAttempts(r.getMaxAttempts())
+                .lateAllowed(r.isLateAllowed())
+                .minWordCount(r.getMinWordCount())
+                .maxWordCount(r.getMaxWordCount())
+                .namingPattern(r.getNamingPattern())
+                .requiredHeadings(r.getRequiredHeadings())
                 .build();
     }
 
     private SubmissionResponse toResponse(Submission s) {
+        SubmissionRules r = s.getRules();
         return SubmissionResponse.builder()
                 .id(s.getId())
                 .title(s.getTitle())
@@ -143,9 +150,13 @@ public class SubmissionService {
                 .lecturerId(s.getLecturer() != null ? s.getLecturer().getId() : null)
                 .dueDate(s.getDueDate())
                 .maxPoints(s.getMaxPoints())
-                .allowedFileTypes(s.getRules() != null ? s.getRules().getAllowedFileTypes() : null)
-                .maxAttempts(s.getRules() != null ? s.getRules().getMaxAttempts() : 1)
-                .lateAllowed(s.getRules() != null && s.getRules().isLateAllowed())
+                .allowedFileTypes(r != null ? r.getAllowedFileTypes() : null)
+                .maxAttempts(r != null ? r.getMaxAttempts() : 1)
+                .lateAllowed(r != null && r.isLateAllowed())
+                .minWordCount(r != null ? r.getMinWordCount() : null)
+                .maxWordCount(r != null ? r.getMaxWordCount() : null)
+                .namingPattern(r != null ? r.getNamingPattern() : null)
+                .requiredHeadings(r != null ? r.getRequiredHeadings() : null)
                 .templateFileName(s.getTemplateFileName())
                 .lastNotifiedAt(s.getLastNotifiedAt())
                 .createdAt(s.getCreatedAt())

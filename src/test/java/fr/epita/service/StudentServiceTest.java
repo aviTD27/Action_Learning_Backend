@@ -7,10 +7,13 @@ import fr.epita.model.AppUser;
 import fr.epita.model.Cohort;
 import fr.epita.model.Programme;
 import fr.epita.model.Student;
+import fr.epita.model.University;
 import fr.epita.repository.AppUserRepository;
 import fr.epita.repository.CohortRepository;
+import fr.epita.repository.PendingRegistrationRepository;
 import fr.epita.repository.ProgrammeRepository;
 import fr.epita.repository.StudentRepository;
+import fr.epita.repository.UniversityRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -18,31 +21,23 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 public class StudentServiceTest {
 
-    @Mock
-    private StudentRepository studentRepo;
-
-    @Mock
-    private CohortRepository cohortRepo;
-
-    @Mock
-    private ProgrammeRepository programmeRepo;
-
-    @Mock
-    private AppUserRepository appUserRepo;
-
-    @Mock
-    private PasswordEncoder passwordEncoder;
-
-    @Mock
-    private EmailService emailService;
+    @Mock private StudentRepository studentRepo;
+    @Mock private CohortRepository cohortRepo;
+    @Mock private ProgrammeRepository programmeRepo;
+    @Mock private AppUserRepository appUserRepo;
+    @Mock private UniversityRepository universityRepo;
+    @Mock private PendingRegistrationRepository registrationRepo;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private EmailService emailService;
 
     @InjectMocks
     private StudentService studentService;
@@ -51,17 +46,26 @@ public class StudentServiceTest {
     private Student student;
     private Cohort cohort;
     private Programme programme;
+    private University university;
+    private AppUser currentUser;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
 
+        university = University.builder().id(1L).name("EPITA").code("EPITA").domain("epita.fr").build();
+
         programme = new Programme();
         programme.setId(1L);
         programme.setName("MSc SE");
+        programme.setUniversity(university);
 
         cohort = new Cohort();
         cohort.setId(10L);
+        cohort.setName("SE 2025");
+
+        // Logged-in uni-admin in the same tenant as the student.
+        currentUser = AppUser.builder().universityId(1L).email("admin@epita.fr").build();
 
         req = new CreateStudentRequest();
         req.setFirstName("Alice");
@@ -77,7 +81,7 @@ public class StudentServiceTest {
                 .id(1L)
                 .firstName("Alice")
                 .lastName("Johnson")
-                .email("alice.johnson@gmail.com")
+                .email("johnson-alice@epita.fr")
                 .password("hashed")
                 .studentRef("STU-2025F-001")
                 .programme(programme)
@@ -88,10 +92,13 @@ public class StudentServiceTest {
 
     @Test
     void testCreateStudent() {
+        when(studentRepo.existsByStudentRef(req.getStudentRef())).thenReturn(false);
         when(cohortRepo.findById(10L)).thenReturn(Optional.of(cohort));
         when(programmeRepo.findById(1L)).thenReturn(Optional.of(programme));
-        when(passwordEncoder.encode(any())).thenReturn("hashed");
-        when(appUserRepo.save(any(AppUser.class))).thenReturn(null);
+        when(universityRepo.findById(1L)).thenReturn(Optional.of(university));
+        when(studentRepo.existsByEmail(anyString())).thenReturn(false);
+        when(appUserRepo.existsByEmail(anyString())).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed");
         when(studentRepo.save(any(Student.class))).thenReturn(student);
 
         StudentResponse res = studentService.create(req, 1L);
@@ -117,7 +124,7 @@ public class StudentServiceTest {
         when(cohortRepo.findById(10L)).thenReturn(Optional.of(cohort));
         when(studentRepo.save(any(Student.class))).thenReturn(student);
 
-        StudentResponse res = studentService.update(1L, req);
+        StudentResponse res = studentService.update(1L, req, currentUser);
 
         assertEquals("Alice", res.getFirstName());
     }
@@ -125,8 +132,9 @@ public class StudentServiceTest {
     @Test
     void testDeactivateStudent() {
         when(studentRepo.findById(1L)).thenReturn(Optional.of(student));
+        when(studentRepo.save(any(Student.class))).thenReturn(student);
 
-        studentService.deactivate(1L);
+        studentService.deactivate(1L, currentUser);
 
         verify(studentRepo, times(1)).save(any(Student.class));
     }

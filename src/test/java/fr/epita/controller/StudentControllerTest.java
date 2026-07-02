@@ -23,20 +23,19 @@ public class StudentControllerTest {
     @Mock
     private StudentService studentService;
 
-    @Mock
-    private AppUser currentUser;
-
     @InjectMocks
     private StudentController studentController;
 
     private CreateStudentRequest req;
     private StudentResponse res;
+    private AppUser currentUser;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
 
-        when(currentUser.getUniversityId()).thenReturn(1L);
+        // The logged-in uni-admin whose tenant the student belongs to.
+        currentUser = AppUser.builder().universityId(1L).email("admin@epita.fr").build();
 
         req = new CreateStudentRequest();
         req.setFirstName("Alice");
@@ -52,7 +51,7 @@ public class StudentControllerTest {
         res.setId(1L);
         res.setFirstName("Alice");
         res.setLastName("Johnson");
-        res.setEmail("alice.johnson@gmail.com");
+        res.setEmail("johnson-alice@epita.fr");
         res.setStudentRef("STU-2025F-001");
         res.setProgrammeId(1L);
         res.setProgrammeName("MSc SE");
@@ -73,13 +72,14 @@ public class StudentControllerTest {
 
     @Test
     void testGetAllStudents() {
-        when(studentService.getAll(null)).thenReturn(List.of(res));
+        // No explicit universityId → controller falls back to the current user's tenant (1L).
+        when(studentService.getAll(1L)).thenReturn(List.of(res));
 
-        ResponseEntity<List<StudentResponse>> response = studentController.getAll(null);
+        ResponseEntity<List<StudentResponse>> response = studentController.getAll(null, currentUser);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(1, response.getBody().size());
-        verify(studentService, times(1)).getAll(null);
+        verify(studentService, times(1)).getAll(1L);
     }
 
     @Test
@@ -95,22 +95,22 @@ public class StudentControllerTest {
 
     @Test
     void testUpdateStudent() {
-        when(studentService.update(1L, req)).thenReturn(res);
+        when(studentService.update(1L, req, currentUser)).thenReturn(res);
 
-        ResponseEntity<StudentResponse> response = studentController.update(1L, req);
+        ResponseEntity<StudentResponse> response = studentController.update(1L, req, currentUser);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("Alice", response.getBody().getFirstName());
-        verify(studentService, times(1)).update(1L, req);
+        verify(studentService, times(1)).update(1L, req, currentUser);
     }
 
     @Test
     void testDeactivateStudent() {
-        doNothing().when(studentService).deactivate(1L);
+        doNothing().when(studentService).deactivate(1L, currentUser);
 
-        ResponseEntity<Void> response = studentController.deactivate(1L);
+        ResponseEntity<Void> response = studentController.deactivate(1L, currentUser);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(studentService, times(1)).deactivate(1L);
+        verify(studentService, times(1)).deactivate(1L, currentUser);
     }
 }

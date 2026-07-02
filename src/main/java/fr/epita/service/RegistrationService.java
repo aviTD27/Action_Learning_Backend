@@ -70,7 +70,7 @@ public class RegistrationService {
     }
 
     /**
-     * Approve: creates the University, provisions a ROLE_ADMIN AppUser whose login
+     * Approve: creates the University, provisions a ROLE_UNI_ADMIN AppUser whose login
      * email is generated as firstname.lastname@domain, then emails both the generated
      * email and the temp password to the requester's contact email.
      */

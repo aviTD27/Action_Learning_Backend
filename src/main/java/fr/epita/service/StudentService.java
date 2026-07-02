@@ -143,7 +143,7 @@ public class StudentService {
 
         // Level 3: every university admin's email is firstname.lastname@domain — extract the suffix.
         if (universityId != null) {
-            Optional<AppUser> admin = appUserRepository.findFirstByUniversityIdAndRole(universityId, Role.ROLE_ADMIN);
+            Optional<AppUser> admin = appUserRepository.findFirstByUniversityIdAndRole(universityId, Role.ROLE_UNI_ADMIN);
             if (admin.isPresent()) {
                 String result = extractDomain(admin.get().getEmail());
                 if (!result.isBlank()) return result;

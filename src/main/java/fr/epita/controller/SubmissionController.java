@@ -4,6 +4,7 @@ import fr.epita.dto.Request.CreateSubmissionRequest;
 import fr.epita.dto.Request.GradeRequest;
 import fr.epita.dto.Response.GradeResponse;
 import fr.epita.dto.Response.SubmissionResponse;
+import fr.epita.enums.Role;
 import fr.epita.model.AppUser;
 import fr.epita.service.GradeService;
 import fr.epita.service.SubmissionService;
@@ -29,7 +30,8 @@ public class SubmissionController {
             @RequestParam(required = false) Long lecturerId,
             @AuthenticationPrincipal AppUser currentUser) {
         Long universityId = currentUser != null ? currentUser.getUniversityId() : null;
-        return ResponseEntity.ok(submissionService.getAll(cohortId, lecturerId, universityId));
+        boolean studentView = currentUser != null && currentUser.getRole() == Role.ROLE_STUDENT;
+        return ResponseEntity.ok(submissionService.getAll(cohortId, lecturerId, universityId, studentView));
     }
 
     @GetMapping("/{id}")
@@ -55,10 +57,30 @@ public class SubmissionController {
         return ResponseEntity.noContent().build();
     }
 
-    /** TODO: Send Email */
     @PatchMapping("/{id}/notify")
     public ResponseEntity<SubmissionResponse> notifyStudents(@PathVariable Long id) {
         return ResponseEntity.ok(submissionService.notifyStudents(id));
+    }
+
+    @PatchMapping("/{id}/publish")
+    public ResponseEntity<SubmissionResponse> publish(@PathVariable Long id) {
+        return ResponseEntity.ok(submissionService.publish(id));
+    }
+
+    @PatchMapping("/{id}/archive")
+    public ResponseEntity<SubmissionResponse> archive(@PathVariable Long id) {
+        return ResponseEntity.ok(submissionService.archive(id));
+    }
+
+    @PatchMapping("/{id}/unarchive")
+    public ResponseEntity<SubmissionResponse> unarchive(@PathVariable Long id) {
+        return ResponseEntity.ok(submissionService.unarchive(id));
+    }
+
+    @PatchMapping("/{id}/reopen/{studentId}")
+    public ResponseEntity<SubmissionResponse> reopen(
+            @PathVariable Long id, @PathVariable Long studentId) {
+        return ResponseEntity.ok(submissionService.reopenForStudent(id, studentId));
     }
 
     //  Grades

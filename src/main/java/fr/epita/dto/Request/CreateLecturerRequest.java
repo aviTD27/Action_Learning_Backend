@@ -14,9 +14,8 @@ public class CreateLecturerRequest {
 
     @NotBlank
     private String lastName;
-
+    
     @Email
-    @NotBlank
     private String email;
 
     @NotBlank
@@ -24,6 +23,9 @@ public class CreateLecturerRequest {
 
     @NotEmpty
     private List<Long> programmeIds;
+
+    /** Optional contact phone number. */
+    private String phone;
 
     private String password;
 

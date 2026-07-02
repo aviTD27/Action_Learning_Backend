@@ -35,6 +35,15 @@ public class Cohort {
     @JsonIgnore
     private List<Student> students;
 
+    /** Lecturers assigned to teach this cohort. */
+    @ManyToMany
+    @JoinTable(
+            name = "cohort_lecturers",
+            joinColumns = @JoinColumn(name = "cohort_id"),
+            inverseJoinColumns = @JoinColumn(name = "lecturer_id")
+    )
+    private List<Lecturer> lecturers;
+
     // TODO Add University relationship
 
 }

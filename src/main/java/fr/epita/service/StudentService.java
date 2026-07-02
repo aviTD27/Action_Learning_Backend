@@ -101,7 +101,10 @@ public class StudentService {
                 .status(request.getStatus())
                 .cohort(cohort)
                 .build();
-        StudentResponse response = toResponse(studentRepository.save(student));
+        Student saved = studentRepository.save(student);
+        // Apply the login block at creation too (e.g. a student created as SUSPENDED cannot log in).
+        syncLoginBlocked(saved);
+        StudentResponse response = toResponse(saved);
 
         String recipient = (request.getPersonalEmail() != null && !request.getPersonalEmail().isBlank())
                 ? request.getPersonalEmail()
@@ -219,7 +222,9 @@ public class StudentService {
             student.setCohort(cohort);
         }
 
-        return toResponse(studentRepository.save(student));
+        Student saved = studentRepository.save(student);
+        syncLoginBlocked(saved);
+        return toResponse(saved);
     }
 
     @Transactional
@@ -229,7 +234,20 @@ public class StudentService {
 
         validateUniversityAccess(student.getProgramme().getUniversity().getId(), currentUser);
         student.setStatus(StudentStatus.INACTIVE);
-        studentRepository.save(student);
+        syncLoginBlocked(studentRepository.save(student));
+    }
+
+    /** A suspended / inactive / expelled / dropped-out student cannot log in. */
+    private void syncLoginBlocked(Student student) {
+        StudentStatus st = student.getStatus();
+        boolean blocked = st == StudentStatus.SUSPENDED
+                || st == StudentStatus.INACTIVE
+                || st == StudentStatus.EXPELLED
+                || st == StudentStatus.DROPPED_OUT;
+        appUserRepository.findByEmail(student.getEmail()).ifPresent(u -> {
+            u.setBlocked(blocked);
+            appUserRepository.save(u);
+        });
     }
 
     private void validateUniversityAccess(Long resourceUniversityId, AppUser currentUser) {

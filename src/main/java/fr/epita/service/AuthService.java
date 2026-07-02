@@ -10,6 +10,7 @@ import fr.epita.repository.AppUserRepository;
 import fr.epita.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -52,6 +53,11 @@ public class AuthService {
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new BadCredentialsException("Invalid credentials");
+        }
+
+        // Deactivated / suspended accounts cannot log in. Distinct exception → 403 with a clear message.
+        if (user.isBlocked()) {
+            throw new DisabledException("Your account has been deactivated. Please contact your administrator.");
         }
 
         return new AuthResponse(jwtUtil.generateToken(user.getEmail(), user.getRole(), user.getUniversityId(), user.getFirstName(), user.getSurname()));

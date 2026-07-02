@@ -1,5 +1,6 @@
 package fr.epita.dto.Response;
 
+import fr.epita.enums.ProgrammeStatus;
 import lombok.Data;
 
 @Data
@@ -11,4 +12,5 @@ public class ProgrammeResponse {
     private String description;
     private Long universityId;
     private String universityName;
+    private ProgrammeStatus status;
 }

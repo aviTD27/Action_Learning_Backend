@@ -31,6 +31,8 @@ public class Lecturer {
     @Column(unique = true)
     private String lecturerRef;
 
+    private String phone;
+
     private String password;
 
     @ManyToMany

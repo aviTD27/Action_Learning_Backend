@@ -47,11 +47,13 @@ public class LecturerService {
         if (lecturerRepository.existsByLecturerRef(request.getLecturerRef())) {
             throw new IllegalStateException("Lecturer reference already exists");
         }
-        String email = request.getEmail().trim().toLowerCase();
-        if (appUserRepository.existsByEmail(email)) {
-            throw new IllegalStateException("An account with this email already exists");
-        }
+        // The form email (if provided) is the PERSONAL email — only the recipient of the credentials.
+        String personalEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null;
         List<Programme> programmes = resolveProgrammes(request.getProgrammeIds());
+
+        // Professional login email: surname-firstname@<university-domain>, numeric suffix on collision.
+        String domain = resolveDomain(programmes);
+        String professionalEmail = generateProfessionalEmail(request.getLastName(), request.getFirstName(), domain);
 
         String tempPassword = generateTempPassword();
         String hashed = passwordEncoder.encode(tempPassword);
@@ -59,7 +61,7 @@ public class LecturerService {
         AppUser login = AppUser.builder()
                 .firstName(request.getFirstName())
                 .surname(request.getLastName())
-                .email(email)
+                .email(professionalEmail)
                 .password(hashed)
                 .role(Role.ROLE_LECTURER)
                 .universityId(universityId)
@@ -69,7 +71,8 @@ public class LecturerService {
         Lecturer lecturer = Lecturer.builder()
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
-                .email(email)
+                .email(professionalEmail)
+                .phone(request.getPhone())
                 .lecturerRef(request.getLecturerRef())
                 .password(hashed)
                 .programmes(programmes)
@@ -77,7 +80,8 @@ public class LecturerService {
                 .build();
         LecturerResponse response = toResponse(lecturerRepository.save(lecturer));
 
-        emailService.sendAccountCreatedEmail(email, request.getFirstName(), email, tempPassword, "Lecturer");
+        String recipient = (personalEmail != null && !personalEmail.isBlank()) ? personalEmail : professionalEmail;
+        emailService.sendAccountCreatedEmail(recipient, request.getFirstName(), professionalEmail, tempPassword, "Lecturer");
 
         return response;
     }
@@ -88,6 +92,35 @@ public class LecturerService {
             sb.append(PASSWORD_CHARS.charAt(RANDOM.nextInt(PASSWORD_CHARS.length())));
         }
         return sb.toString();
+    }
+
+    /** surname-firstname@domain, lowercased; appends a numeric suffix on collision. */
+    private String generateProfessionalEmail(String surname, String firstName, String domain) {
+        String local = sanitize(surname) + "-" + sanitize(firstName);
+        String candidate = local + "@" + domain;
+        if (!appUserRepository.existsByEmail(candidate)) return candidate;
+        int n = 2;
+        while (appUserRepository.existsByEmail(local + n + "@" + domain)) n++;
+        return local + n + "@" + domain;
+    }
+
+    private String sanitize(String s) {
+        return s == null ? "" : s.trim().toLowerCase().replaceAll("[^a-z0-9]", "");
+    }
+
+    /** University email domain from the lecturer's programmes; falls back to a code-based domain. */
+    private String resolveDomain(List<Programme> programmes) {
+        return programmes.stream()
+                .map(Programme::getUniversity)
+                .filter(u -> u != null)
+                .map(u -> {
+                    String d = u.getDomain();
+                    if (d != null && !d.isBlank()) return d.trim().toLowerCase();
+                    String code = u.getCode();
+                    return code != null ? code.trim().toLowerCase().replaceAll("[^a-z0-9]", "") + ".edu" : "university.edu";
+                })
+                .findFirst()
+                .orElse("university.edu");
     }
 
     @Transactional
@@ -101,7 +134,12 @@ public class LecturerService {
 
         lecturer.setFirstName(request.getFirstName());
         lecturer.setLastName(request.getLastName());
-        lecturer.setEmail(request.getEmail());
+        if (request.getEmail() != null && !request.getEmail().isBlank()) {
+            lecturer.setEmail(request.getEmail());
+        }
+        if (request.getPhone() != null) {
+            lecturer.setPhone(request.getPhone());
+        }
         lecturer.setLecturerRef(request.getLecturerRef());
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             lecturer.setPassword(request.getPassword());
@@ -111,7 +149,13 @@ public class LecturerService {
             lecturer.setStatus(request.getStatus());
         }
 
-        return toResponse(lecturerRepository.save(lecturer));
+        Lecturer saved = lecturerRepository.save(lecturer);
+        // Keep the login in sync: a deactivated lecturer cannot log in.
+        appUserRepository.findByEmail(saved.getEmail()).ifPresent(u -> {
+            u.setBlocked(saved.getStatus() != LecturerStatus.ACTIVE);
+            appUserRepository.save(u);
+        });
+        return toResponse(saved);
     }
 
     private List<Programme> resolveProgrammes(List<Long> ids) {
@@ -132,6 +176,7 @@ public class LecturerService {
                 .lastName(lecturer.getLastName())
                 .email(lecturer.getEmail())
                 .lecturerRef(lecturer.getLecturerRef())
+                .phone(lecturer.getPhone())
                 .programmeIds(lecturer.getProgrammes().stream().map(Programme::getId).toList())
                 .programmeNames(lecturer.getProgrammes().stream().map(Programme::getName).toList())
                 .status(lecturer.getStatus().name())

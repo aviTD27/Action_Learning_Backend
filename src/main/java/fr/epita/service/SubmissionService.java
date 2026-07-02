@@ -140,10 +140,10 @@ public class SubmissionService {
 
         Submission saved = submissionRepository.save(submission);
 
-        // If students have already submitted, an edit notifies the affected students (row 72).
+        // Rows 72 & 112 — if students have already submitted, an edit notifies the affected students.
         if (uploadRepository.countBySubmissionId(saved.getId()) > 0) {
-            notificationService.notifyCohort(saved, NotificationType.MANUAL,
-                    "Assignment updated: \"" + saved.getTitle() + "\". Please review the changes.");
+            notificationService.notifyCohort(saved, NotificationType.ASSIGNMENT_EDITED,
+                    "Assignment updated: \"" + saved.getTitle() + "\". The instructions changed — please review.");
             saved.setLastNotifiedAt(Instant.now());
             saved = submissionRepository.save(saved);
         }
@@ -204,12 +204,13 @@ public class SubmissionService {
         return toResponse(submissionRepository.save(submission));
     }
 
+    /** Row 113 — manual reminder sent only to students who have NOT yet submitted. */
     @Transactional
     public SubmissionResponse notifyStudents(Long id) {
         Submission submission = find(id);
-        notificationService.notifyCohort(submission, NotificationType.MANUAL,
-                "Reminder from your lecturer: \"" + submission.getTitle()
-                        + "\" is due " + submission.deadline() + ".");
+        notificationService.notifyNonSubmitters(submission, NotificationType.MANUAL,
+                "Reminder from your lecturer: you have not submitted \"" + submission.getTitle()
+                        + "\" yet — it is due " + submission.deadline() + ".");
         submission.setLastNotifiedAt(Instant.now());
         return toResponse(submissionRepository.save(submission));
     }

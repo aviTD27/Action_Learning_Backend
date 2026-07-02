@@ -7,6 +7,7 @@ import fr.epita.model.Student;
 import fr.epita.model.Submission;
 import fr.epita.repository.NotificationRepository;
 import fr.epita.repository.StudentRepository;
+import fr.epita.repository.SubmissionUploadRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -20,29 +21,47 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final StudentRepository studentRepository;
+    private final SubmissionUploadRepository uploadRepository;
     private final EmailService emailService;
 
     @Transactional
     public void notifyCohort(Submission submission, NotificationType type, String message) {
-        List<Student> students = studentRepository.findByCohortId(submission.getCohort().getId());
+        for (Student student : studentRepository.findByCohortId(submission.getCohort().getId())) {
+            notifyStudent(student, submission, type, message);
+        }
+    }
 
-        List<Notification> notifications = students.stream()
-                .map(student -> Notification.builder()
-                        .student(student)
-                        .submission(submission)
-                        .type(type)
-                        .message(message)
-                        .readFlag(false)
-                        .build())
-                .toList();
-        notificationRepository.saveAll(notifications);
+    /** Notifies (in-app + email) a single student about a submission. */
+    @Transactional
+    public void notifyStudent(Student student, Submission submission, NotificationType type, String message) {
+        notificationRepository.save(Notification.builder()
+                .student(student)
+                .submission(submission)
+                .type(type)
+                .message(message)
+                .readFlag(false)
+                .build());
+        if (student.getEmail() != null && !student.getEmail().isBlank()) {
+            String subject = "Action Learning Platform — " + submission.getTitle();
+            emailService.sendNotificationEmail(student.getEmail(), student.getFirstName(), subject, message);
+        }
+    }
 
-        String subject = "Action Learning Platform — " + submission.getTitle();
-        for (Student student : students) {
-            if (student.getEmail() != null && !student.getEmail().isBlank()) {
-                emailService.sendNotificationEmail(student.getEmail(), student.getFirstName(), subject, message);
+    /** Row 113 — notifies only cohort students who have NOT turned in this submission. Returns how many. */
+    @Transactional
+    public int notifyNonSubmitters(Submission submission, NotificationType type, String message) {
+        int count = 0;
+        for (Student student : studentRepository.findByCohortId(submission.getCohort().getId())) {
+            boolean submitted = uploadRepository
+                    .findTopBySubmissionIdAndStudentIdOrderByUploadedAtDesc(submission.getId(), student.getId())
+                    .map(u -> Boolean.TRUE.equals(u.getTurnedIn()))
+                    .orElse(false);
+            if (!submitted) {
+                notifyStudent(student, submission, type, message);
+                count++;
             }
         }
+        return count;
     }
 
     // ── Student /me methods (look up student by email) ──

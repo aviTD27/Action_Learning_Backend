@@ -17,7 +17,9 @@ public class LecturerResponse {
     private String lastName;
     private String email;
     private String lecturerRef;
+    private String phone;
     private List<Long> programmeIds;
     private List<String> programmeNames;
+    private String universityName;
     private String status;
 }

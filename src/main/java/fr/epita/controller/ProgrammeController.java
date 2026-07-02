@@ -30,6 +30,13 @@ public class ProgrammeController {
         return ResponseEntity.ok(programmeService.getAll(resolve(universityId, currentUser)));
     }
 
+    @GetMapping("/archived")
+    public ResponseEntity<List<ProgrammeResponse>> getArchived(
+            @RequestParam(required = false) Long universityId,
+            @AuthenticationPrincipal AppUser currentUser) {
+        return ResponseEntity.ok(programmeService.getArchived(resolve(universityId, currentUser)));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ProgrammeResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(programmeService.getById(id));
@@ -40,6 +47,18 @@ public class ProgrammeController {
             @PathVariable Long id,
             @RequestBody CreateProgrammeRequest request) {
         return ResponseEntity.ok(programmeService.update(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> archive(@PathVariable Long id) {
+        programmeService.archive(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/unarchive")
+    public ResponseEntity<ProgrammeResponse> unarchive(@PathVariable Long id) {
+        programmeService.unarchive(id);
+        return ResponseEntity.ok(programmeService.getById(id));
     }
 
     private Long resolve(Long universityId, AppUser currentUser) {

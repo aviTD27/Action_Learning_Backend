@@ -1,6 +1,7 @@
 package fr.epita.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import fr.epita.enums.ProgrammeStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -34,5 +35,9 @@ public class Programme {
     @ManyToOne
     @JoinColumn(name = "university_id")
     private University university;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(255) default 'ACTIVE'")
+    private ProgrammeStatus status = ProgrammeStatus.ACTIVE;
 
 }

@@ -9,6 +9,7 @@ import org.springframework.security.authentication.DisabledException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.RestClientException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -54,6 +55,14 @@ public class GlobalExceptionHandler {
     }
 
     // Internal Server Error — log the full stack trace and surface the real cause to the client.
+    // AI / compliance service unreachable
+    @ExceptionHandler(RestClientException.class)
+    public ResponseEntity<?> handleRestClient(RestClientException ex) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE,
+                "The compliance service is currently unavailable. Please ensure the AI service is running and try again.");
+    }
+
+    // Internal Server Error
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleGeneral(Exception ex) {
         ex.printStackTrace(); // ensure the trace appears in the backend console

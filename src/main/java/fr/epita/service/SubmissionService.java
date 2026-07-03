@@ -19,8 +19,20 @@ import fr.epita.repository.SubmissionUploadRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -37,6 +49,9 @@ public class SubmissionService {
     private final LecturerRepository lecturerRepository;
     private final NotificationService notificationService;
 
+    @Value("${app.upload.dir:uploads}")
+    private String uploadDir;
+
     /**
      * @param studentView when true, only PUBLISHED assignments are returned (drafts/archived are hidden).
      */
@@ -52,7 +67,7 @@ public class SubmissionService {
             submissions = submissionRepository.findAll();
         }
         return submissions.stream()
-                .filter(s -> !studentView || s.getStatus() == SubmissionStatus.PUBLISHED)
+                .filter(s -> !studentView || s.getStatus() == null || s.getStatus() == SubmissionStatus.PUBLISHED)
                 .map(this::toResponse)
                 .toList();
     }
@@ -86,6 +101,7 @@ public class SubmissionService {
             Submission submission = Submission.builder()
                     .title(request.getTitle())
                     .description(request.getDescription())
+                    .instructions(request.getInstructions())
                     .additionalNotes(request.getAdditionalNotes())
                     .submissionType(type)
                     .status(status)
@@ -126,6 +142,7 @@ public class SubmissionService {
 
         submission.setTitle(request.getTitle());
         submission.setDescription(request.getDescription());
+        submission.setInstructions(request.getInstructions());
         submission.setAdditionalNotes(request.getAdditionalNotes());
         if (request.getSubmissionType() != null) submission.setSubmissionType(request.getSubmissionType());
         submission.setCohort(cohort);
@@ -215,6 +232,33 @@ public class SubmissionService {
         return toResponse(submissionRepository.save(submission));
     }
 
+    @Transactional
+    public SubmissionResponse saveTemplate(Long id, MultipartFile file) throws IOException {
+        Submission submission = find(id);
+        String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "template";
+        Path dir = Paths.get(uploadDir, "templates", String.valueOf(id));
+        Files.createDirectories(dir);
+        Path target = dir.resolve(originalName);
+        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+        submission.setTemplateFileName(originalName);
+        submission.setTemplateStoredPath(target.toAbsolutePath().toString());
+        return toResponse(submissionRepository.save(submission));
+    }
+
+    public ResponseEntity<Resource> downloadTemplate(Long id) {
+        Submission submission = find(id);
+        if (submission.getTemplateStoredPath() == null) {
+            return ResponseEntity.notFound().build();
+        }
+        Resource resource = new FileSystemResource(Path.of(submission.getTemplateStoredPath()));
+        if (!resource.exists()) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + submission.getTemplateFileName() + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
+    }
+
     private Submission find(Long id) {
         return submissionRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Submission not found"));
@@ -246,6 +290,7 @@ public class SubmissionService {
                 .id(s.getId())
                 .title(s.getTitle())
                 .description(s.getDescription())
+                .instructions(s.getInstructions())
                 .additionalNotes(s.getAdditionalNotes())
                 .submissionType(s.getSubmissionType() != null ? s.getSubmissionType().name() : SubmissionType.BOTH.name())
                 .status(s.getStatus() != null ? s.getStatus().name() : SubmissionStatus.PUBLISHED.name())
@@ -264,6 +309,7 @@ public class SubmissionService {
                 .namingPattern(r != null ? r.getNamingPattern() : null)
                 .requiredHeadings(r != null ? r.getRequiredHeadings() : null)
                 .templateFileName(s.getTemplateFileName())
+                .hasTemplate(s.getTemplateStoredPath() != null)
                 .hasTemplateFile(s.getTemplateStoredPath() != null && !s.getTemplateStoredPath().isBlank())
                 .lastNotifiedAt(s.getLastNotifiedAt())
                 .createdAt(s.getCreatedAt())

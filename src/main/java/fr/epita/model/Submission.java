@@ -64,11 +64,12 @@ public class Submission {
     @Embedded
     private SubmissionRules rules;
 
-    /** Original filename of the uploaded template/brief file (shown to students). */
     private String templateFileName;
 
-    /** Absolute path of the stored template file on disk. */
     private String templateStoredPath;
+
+    @Column(length = 5000)
+    private String instructions;
 
     /** Student ids explicitly re-opened for a late exception. */
     @Builder.Default

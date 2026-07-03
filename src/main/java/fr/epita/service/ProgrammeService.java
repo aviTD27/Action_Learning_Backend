@@ -2,6 +2,7 @@ package fr.epita.service;
 
 import fr.epita.dto.Request.CreateProgrammeRequest;
 import fr.epita.dto.Response.ProgrammeResponse;
+import fr.epita.enums.ProgrammeStatus;
 import fr.epita.model.Programme;
 import fr.epita.model.University;
 import fr.epita.repository.CohortRepository;
@@ -26,8 +27,8 @@ public class ProgrammeService {
 
     public ProgrammeResponse create(CreateProgrammeRequest request) {
 
-        if (programmeRepository.existsByName(request.getName())) {
-            throw new IllegalStateException("Programme already exists");
+        if (programmeRepository.existsByNameAndUniversityId(request.getName(), request.getUniversityId())) {
+            throw new IllegalStateException("A programme with this name already exists for this university");
         }
 
         University university = universityRepository.findById(request.getUniversityId())
@@ -38,6 +39,7 @@ public class ProgrammeService {
                 .code(request.getCode())
                 .description(request.getDescription())
                 .university(university)
+                .status(ProgrammeStatus.ACTIVE)
                 .build();
 
         return toResponse(programmeRepository.save(programme));

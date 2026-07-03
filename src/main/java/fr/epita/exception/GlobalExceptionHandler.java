@@ -54,6 +54,7 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage());
     }
 
+    // Internal Server Error — log the full stack trace and surface the real cause to the client.
     // AI / compliance service unreachable
     @ExceptionHandler(RestClientException.class)
     public ResponseEntity<?> handleRestClient(RestClientException ex) {
@@ -64,7 +65,15 @@ public class GlobalExceptionHandler {
     // Internal Server Error
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleGeneral(Exception ex) {
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
+        ex.printStackTrace(); // ensure the trace appears in the backend console
+        String detail = ex.getClass().getSimpleName()
+                + (ex.getMessage() != null ? ": " + ex.getMessage() : "");
+        Throwable root = ex;
+        while (root.getCause() != null && root.getCause() != root) root = root.getCause();
+        if (root != ex && root.getMessage() != null) {
+            detail += " | caused by " + root.getClass().getSimpleName() + ": " + root.getMessage();
+        }
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, detail);
     }
 
     private ResponseEntity<?> buildResponse(HttpStatus status, String message) {

@@ -28,7 +28,7 @@ public class Cohort {
     private Programme programme;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "VARCHAR(50)")
     private CohortStatus status = CohortStatus.NOT_STARTED;
 
     @OneToMany(mappedBy = "cohort")

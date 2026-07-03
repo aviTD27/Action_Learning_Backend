@@ -14,6 +14,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -73,10 +74,10 @@ public class CohortService {
         return toResponse(cohortRepository.save(cohort));
     }
 
-    /** Loads the lecturers for the given ids; returns an empty list when none are supplied. */
+    /** Loads the lecturers for the given ids; returns a mutable list (Hibernate manages the join). */
     private List<Lecturer> resolveLecturers(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) return List.of();
-        List<Lecturer> lecturers = lecturerRepository.findAllById(ids);
+        if (ids == null || ids.isEmpty()) return new ArrayList<>();
+        List<Lecturer> lecturers = new ArrayList<>(lecturerRepository.findAllById(ids));
         if (lecturers.size() != ids.size()) {
             throw new EntityNotFoundException("One or more lecturers not found");
         }

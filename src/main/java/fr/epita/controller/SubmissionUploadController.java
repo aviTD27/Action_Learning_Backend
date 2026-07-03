@@ -3,6 +3,7 @@ package fr.epita.controller;
 import fr.epita.dto.Response.ComplianceReportResponse;
 import fr.epita.dto.Response.MyUploadStatusResponse;
 import fr.epita.dto.Response.StudentSubmissionResponse;
+import fr.epita.enums.Role;
 import fr.epita.model.AppUser;
 import fr.epita.model.Student;
 import fr.epita.model.Submission;
@@ -60,7 +61,11 @@ public class SubmissionUploadController {
 
     @GetMapping("/{submissionId}/student-submissions")
     public ResponseEntity<List<StudentSubmissionResponse>> getStudentSubmissions(
-            @PathVariable Long submissionId) {
+            @PathVariable Long submissionId,
+            @AuthenticationPrincipal AppUser currentUser) {
+        if (currentUser == null || currentUser.getRole() == Role.ROLE_STUDENT) {
+            return ResponseEntity.status(403).build();
+        }
         Submission submission = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> new EntityNotFoundException("Submission not found"));
         return ResponseEntity.ok(uploadService.getStudentSubmissions(submission));
@@ -98,10 +103,16 @@ public class SubmissionUploadController {
         return fileResponse(data, submission.getTemplateFileName());
     }
 
-    /** Row 75 — lecturer downloads a single student's submitted file. */
+    /** Row 75 — lecturer downloads a single student's submitted file. Students can only download their own. */
     @GetMapping("/uploads/{uploadId}/download")
-    public ResponseEntity<byte[]> downloadUpload(@PathVariable Long uploadId) throws IOException {
+    public ResponseEntity<byte[]> downloadUpload(
+            @PathVariable Long uploadId,
+            @AuthenticationPrincipal AppUser currentUser) throws IOException {
         SubmissionUpload upload = uploadService.getUploadForDownload(uploadId);
+        if (currentUser != null && currentUser.getRole() == Role.ROLE_STUDENT
+                && !upload.getStudent().getEmail().equals(currentUser.getEmail())) {
+            return ResponseEntity.status(403).build();
+        }
         if (upload.getStoredPath() == null || upload.getStoredPath().isBlank()) {
             return ResponseEntity.noContent().build();
         }
@@ -111,7 +122,12 @@ public class SubmissionUploadController {
 
     /** Row 76 — lecturer downloads every submission for an assignment as one ZIP. */
     @GetMapping("/{submissionId}/download-zip")
-    public ResponseEntity<byte[]> downloadZip(@PathVariable Long submissionId) throws IOException {
+    public ResponseEntity<byte[]> downloadZip(
+            @PathVariable Long submissionId,
+            @AuthenticationPrincipal AppUser currentUser) throws IOException {
+        if (currentUser == null || currentUser.getRole() == Role.ROLE_STUDENT) {
+            return ResponseEntity.status(403).build();
+        }
         byte[] zip = uploadService.buildSubmissionsZip(submissionId);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,

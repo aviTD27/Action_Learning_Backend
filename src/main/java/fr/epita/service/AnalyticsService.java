@@ -4,6 +4,7 @@ import fr.epita.dto.Response.AtRiskStudentResponse;
 import fr.epita.dto.Response.CohortBenchmarkResponse;
 import fr.epita.dto.Response.GradeDistributionResponse;
 import fr.epita.dto.Response.GradingBacklogResponse;
+import fr.epita.dto.Response.LecturerOverviewResponse;
 import fr.epita.dto.Response.LecturerWorkloadResponse;
 import fr.epita.dto.Response.TenantSummaryResponse;
 import fr.epita.dto.Response.TrendPointResponse;
@@ -37,9 +38,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -300,6 +305,196 @@ public class AnalyticsService {
         }
         out.sort(Comparator.comparingLong(LecturerWorkloadResponse::getGradingBacklog).reversed());
         return out;
+    }
+
+    //  Lecturer dashboard overview (resolved by the authenticated lecturer's email)
+    @Transactional(readOnly = true)
+    public LecturerOverviewResponse lecturerOverview(String email, Long universityId) {
+        Lecturer lecturer = lecturerRepository.findByEmail(email).orElse(null);
+        if (lecturer == null) {
+            return LecturerOverviewResponse.builder()
+                    .needsGrading(List.of()).atRisk(List.of())
+                    .gradeDistribution(emptyBands()).recentActivity(List.of())
+                    .build();
+        }
+        Long lid = lecturer.getId();
+        List<Submission> subs = submissionRepository.findByLecturerId(lid);
+
+        List<StudentGrade> allUniGrades = (universityId != null)
+                ? studentGradeRepository.findBySubmission_Cohort_Programme_University_Id(universityId)
+                : new ArrayList<>();
+        List<StudentGrade> myGrades = allUniGrades.stream()
+                .filter(g -> g.getSubmission() != null && g.getSubmission().getLecturer() != null
+                        && lid.equals(g.getSubmission().getLecturer().getId()))
+                .toList();
+
+        Set<String> gradedKeys = new HashSet<>();
+        for (StudentGrade g : myGrades) {
+            if (g.getStudent() != null && g.getSubmission() != null) {
+                gradedKeys.add(g.getSubmission().getId() + ":" + g.getStudent().getId());
+            }
+        }
+
+        long compliancePassed = 0, complianceFailed = 0, onTime = 0, late = 0, backlog = 0;
+        List<LecturerOverviewResponse.NeedsGradingItem> needs = new ArrayList<>();
+        List<LecturerOverviewResponse.ActivityItem> activity = new ArrayList<>();
+
+        for (Submission s : subs) {
+            long awaiting = 0;
+            Instant oldest = null;
+            Set<String> seen = new HashSet<>();
+            for (SubmissionUpload u : uploadRepository.findBySubmissionIdAndTurnedInTrue(s.getId())) {
+                if (u.getStudent() == null) continue;
+                String key = s.getId() + ":" + u.getStudent().getId();
+
+                if (u.isCompliancePassed()) compliancePassed++; else complianceFailed++;
+
+                boolean isLate = u.getTurnedInAt() != null
+                        && u.getTurnedInAt().atZone(ZONE).toLocalDateTime().isAfter(s.deadline());
+                if (isLate) late++; else onTime++;
+
+                if (seen.add(key) && !gradedKeys.contains(key)) {
+                    awaiting++;
+                    if (u.getTurnedInAt() != null && (oldest == null || u.getTurnedInAt().isBefore(oldest))) {
+                        oldest = u.getTurnedInAt();
+                    }
+                }
+
+                if (u.getTurnedInAt() != null) {
+                    activity.add(LecturerOverviewResponse.ActivityItem.builder()
+                            .type("SUBMISSION")
+                            .text(u.getStudent().getFirstName() + " " + u.getStudent().getLastName()
+                                    + " submitted \"" + s.getTitle() + "\"")
+                            .at(u.getTurnedInAt().toString())
+                            .build());
+                }
+            }
+            backlog += awaiting;
+            if (awaiting > 0) {
+                needs.add(LecturerOverviewResponse.NeedsGradingItem.builder()
+                        .submissionId(s.getId())
+                        .title(s.getTitle())
+                        .cohortName(s.getCohort() != null ? s.getCohort().getName() : null)
+                        .awaiting(awaiting)
+                        .oldestSubmittedAt(oldest != null ? oldest.toString() : null)
+                        .build());
+            }
+        }
+        needs.sort(Comparator.comparing(n -> n.getOldestSubmittedAt() == null ? "9999" : n.getOldestSubmittedAt()));
+
+        for (StudentGrade g : myGrades) {
+            if (g.getStatus() == GradeStatus.RELEASED && g.getGradedAt() != null
+                    && g.getStudent() != null && g.getSubmission() != null) {
+                activity.add(LecturerOverviewResponse.ActivityItem.builder()
+                        .type("GRADE")
+                        .text("Released grade for " + g.getStudent().getFirstName() + " "
+                                + g.getStudent().getLastName() + " — \"" + g.getSubmission().getTitle() + "\"")
+                        .at(g.getGradedAt().toString())
+                        .build());
+            }
+        }
+        activity.sort(Comparator.comparing(LecturerOverviewResponse.ActivityItem::getAt, Comparator.reverseOrder()));
+        List<LecturerOverviewResponse.ActivityItem> recent = activity.stream().limit(8).collect(Collectors.toList());
+
+        List<StudentGrade> released = myGrades.stream().filter(g -> g.getStatus() == GradeStatus.RELEASED).toList();
+        List<GradeDistributionResponse> dist = bandGrades(released);
+
+        Set<Long> cohortIds = subs.stream()
+                .map(s -> s.getCohort() != null ? s.getCohort().getId() : null)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<AtRiskStudentResponse> atRisk = atRiskForCohorts(cohortIds, subs, released);
+
+        return LecturerOverviewResponse.builder()
+                .gradingBacklog(backlog)
+                .compliancePassed(compliancePassed)
+                .complianceFailed(complianceFailed)
+                .onTime(onTime)
+                .late(late)
+                .needsGrading(needs)
+                .atRisk(atRisk)
+                .gradeDistribution(dist)
+                .recentActivity(recent)
+                .build();
+    }
+
+    private List<AtRiskStudentResponse> atRiskForCohorts(Set<Long> cohortIds, List<Submission> subs,
+                                                         List<StudentGrade> released) {
+        if (cohortIds.isEmpty()) return List.of();
+        Set<String> turnedInKeys = turnedInKeys(subs);
+        LocalDateTime now = LocalDateTime.now();
+
+        Map<Long, Student> studentMap = new LinkedHashMap<>();
+        for (Long cid : cohortIds) {
+            for (Student st : studentRepository.findByCohortId(cid)) studentMap.putIfAbsent(st.getId(), st);
+        }
+
+        List<AtRiskStudentResponse> out = new ArrayList<>();
+        for (Student st : studentMap.values()) {
+            Long sid = st.getId();
+            List<StudentGrade> myG = released.stream()
+                    .filter(g -> g.getStudent() != null && sid.equals(g.getStudent().getId()))
+                    .toList();
+            Double avg = myG.isEmpty() ? null
+                    : round1(myG.stream().mapToDouble(this::scorePct).average().orElse(0.0));
+
+            long missed = 0;
+            Long cohortId = st.getCohort() != null ? st.getCohort().getId() : null;
+            if (cohortId != null) {
+                for (Submission s : subs) {
+                    if (s.getCohort() == null || !cohortId.equals(s.getCohort().getId())) continue;
+                    if (s.getStatus() != SubmissionStatus.PUBLISHED) continue;
+                    if (!now.isAfter(s.deadline())) continue;
+                    if (!turnedInKeys.contains(s.getId() + ":" + sid)) missed++;
+                }
+            }
+            boolean lowAvg = avg != null && avg < 50.0;
+            boolean manyMissed = missed >= 2;
+            if (!lowAvg && !manyMissed) continue;
+
+            StringBuilder reason = new StringBuilder();
+            if (lowAvg) reason.append("Low average (").append(avg).append("%)");
+            if (manyMissed) {
+                if (reason.length() > 0) reason.append(" · ");
+                reason.append("Missed ").append(missed).append(missed == 1 ? " submission" : " submissions");
+            }
+            out.add(AtRiskStudentResponse.builder()
+                    .studentId(sid)
+                    .studentName(st.getFirstName() + " " + st.getLastName())
+                    .studentRef(st.getStudentRef())
+                    .cohortName(st.getCohort() != null ? st.getCohort().getName() : null)
+                    .programmeName(st.getProgramme() != null ? st.getProgramme().getName() : null)
+                    .avgScorePct(avg)
+                    .gradedCount(myG.size())
+                    .missedSubmissions(missed)
+                    .reason(reason.toString())
+                    .build());
+        }
+        out.sort(Comparator
+                .comparingLong(AtRiskStudentResponse::getMissedSubmissions).reversed()
+                .thenComparing(r -> r.getAvgScorePct() == null ? Double.MAX_VALUE : r.getAvgScorePct()));
+        return out;
+    }
+
+    private List<GradeDistributionResponse> bandGrades(List<StudentGrade> released) {
+        long distinction = 0, good = 0, pass = 0, fail = 0;
+        for (StudentGrade g : released) {
+            double pct = scorePct(g);
+            if (pct >= 85) distinction++;
+            else if (pct >= 70) good++;
+            else if (pct >= 50) pass++;
+            else fail++;
+        }
+        return List.of(
+                GradeDistributionResponse.builder().band("Distinction").count(distinction).build(),
+                GradeDistributionResponse.builder().band("Good").count(good).build(),
+                GradeDistributionResponse.builder().band("Pass").count(pass).build(),
+                GradeDistributionResponse.builder().band("Fail").count(fail).build()
+        );
+    }
+
+    private List<GradeDistributionResponse> emptyBands() {
+        return bandGrades(List.of());
     }
 
     //  Helpers

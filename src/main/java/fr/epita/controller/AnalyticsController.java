@@ -4,6 +4,7 @@ import fr.epita.dto.Response.AtRiskStudentResponse;
 import fr.epita.dto.Response.CohortBenchmarkResponse;
 import fr.epita.dto.Response.GradeDistributionResponse;
 import fr.epita.dto.Response.GradingBacklogResponse;
+import fr.epita.dto.Response.LecturerOverviewResponse;
 import fr.epita.dto.Response.LecturerWorkloadResponse;
 import fr.epita.dto.Response.TenantSummaryResponse;
 import fr.epita.dto.Response.TrendPointResponse;
@@ -71,6 +72,14 @@ public class AnalyticsController {
             @RequestParam(required = false) Long universityId,
             @AuthenticationPrincipal AppUser currentUser) {
         return ResponseEntity.ok(analyticsService.lecturerWorkload(resolve(universityId, currentUser)));
+    }
+
+    @GetMapping("/lecturer/overview")
+    public ResponseEntity<LecturerOverviewResponse> lecturerOverview(
+            @AuthenticationPrincipal AppUser currentUser) {
+        String email = currentUser != null ? currentUser.getEmail() : null;
+        Long universityId = currentUser != null ? currentUser.getUniversityId() : null;
+        return ResponseEntity.ok(analyticsService.lecturerOverview(email, universityId));
     }
 
     private Long resolve(Long universityId, AppUser currentUser) {

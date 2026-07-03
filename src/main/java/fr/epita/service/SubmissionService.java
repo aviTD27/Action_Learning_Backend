@@ -67,7 +67,7 @@ public class SubmissionService {
             submissions = submissionRepository.findAll();
         }
         return submissions.stream()
-                .filter(s -> !studentView || s.getStatus() == SubmissionStatus.PUBLISHED)
+                .filter(s -> !studentView || s.getStatus() == null || s.getStatus() == SubmissionStatus.PUBLISHED)
                 .map(this::toResponse)
                 .toList();
     }

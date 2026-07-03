@@ -9,10 +9,14 @@ import fr.epita.service.GradeService;
 import fr.epita.service.SubmissionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -53,6 +57,18 @@ public class SubmissionController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         submissionService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(value = "/{id}/template", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<SubmissionResponse> uploadTemplate(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(submissionService.saveTemplate(id, file));
+    }
+
+    @GetMapping("/{id}/template/download")
+    public ResponseEntity<Resource> downloadTemplate(@PathVariable Long id) {
+        return submissionService.downloadTemplate(id);
     }
 
     /** TODO: Send Email */

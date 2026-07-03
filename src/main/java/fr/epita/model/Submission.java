@@ -42,8 +42,12 @@ public class Submission {
     @Embedded
     private SubmissionRules rules;
 
-    // TODO Store file
     private String templateFileName;
+
+    private String templateStoredPath;
+
+    @Column(length = 5000)
+    private String instructions;
 
     // TODO Email Notif
     private Instant lastNotifiedAt;

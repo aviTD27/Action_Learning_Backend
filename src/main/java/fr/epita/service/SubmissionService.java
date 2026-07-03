@@ -16,8 +16,20 @@ import fr.epita.repository.SubmissionRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.List;
 
@@ -30,6 +42,9 @@ public class SubmissionService {
     private final CohortRepository cohortRepository;
     private final LecturerRepository lecturerRepository;
     private final NotificationService notificationService;
+
+    @Value("${app.upload.dir:uploads}")
+    private String uploadDir;
 
     public List<SubmissionResponse> getAll(Long cohortId, Long lecturerId, Long universityId) {
         List<Submission> submissions;
@@ -61,6 +76,7 @@ public class SubmissionService {
         Submission submission = Submission.builder()
                 .title(request.getTitle())
                 .description(request.getDescription())
+                .instructions(request.getInstructions())
                 .cohort(cohort)
                 .lecturer(resolveLecturer(request.getLecturerId()))
                 .dueDate(request.getDueDate())
@@ -85,6 +101,7 @@ public class SubmissionService {
 
         submission.setTitle(request.getTitle());
         submission.setDescription(request.getDescription());
+        submission.setInstructions(request.getInstructions());
         submission.setCohort(cohort);
         submission.setDueDate(request.getDueDate());
         submission.setMaxPoints(request.getMaxPoints());
@@ -113,6 +130,33 @@ public class SubmissionService {
                         + "\" is due " + submission.getDueDate() + " 23:59.");
         submission.setLastNotifiedAt(Instant.now());
         return toResponse(submissionRepository.save(submission));
+    }
+
+    @Transactional
+    public SubmissionResponse saveTemplate(Long id, MultipartFile file) throws IOException {
+        Submission submission = find(id);
+        String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "template";
+        Path dir = Paths.get(uploadDir, "templates", String.valueOf(id));
+        Files.createDirectories(dir);
+        Path target = dir.resolve(originalName);
+        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+        submission.setTemplateFileName(originalName);
+        submission.setTemplateStoredPath(target.toAbsolutePath().toString());
+        return toResponse(submissionRepository.save(submission));
+    }
+
+    public ResponseEntity<Resource> downloadTemplate(Long id) {
+        Submission submission = find(id);
+        if (submission.getTemplateStoredPath() == null) {
+            return ResponseEntity.notFound().build();
+        }
+        Resource resource = new FileSystemResource(Path.of(submission.getTemplateStoredPath()));
+        if (!resource.exists()) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + submission.getTemplateFileName() + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
     }
 
     private Submission find(Long id) {
@@ -145,6 +189,7 @@ public class SubmissionService {
                 .id(s.getId())
                 .title(s.getTitle())
                 .description(s.getDescription())
+                .instructions(s.getInstructions())
                 .cohortId(s.getCohort().getId())
                 .cohortName(s.getCohort().getName())
                 .lecturerId(s.getLecturer() != null ? s.getLecturer().getId() : null)
@@ -158,6 +203,7 @@ public class SubmissionService {
                 .namingPattern(r != null ? r.getNamingPattern() : null)
                 .requiredHeadings(r != null ? r.getRequiredHeadings() : null)
                 .templateFileName(s.getTemplateFileName())
+                .hasTemplate(s.getTemplateStoredPath() != null)
                 .lastNotifiedAt(s.getLastNotifiedAt())
                 .createdAt(s.getCreatedAt())
                 .build();

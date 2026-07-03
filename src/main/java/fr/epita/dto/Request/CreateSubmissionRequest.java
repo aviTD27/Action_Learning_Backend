@@ -29,6 +29,7 @@ public class CreateSubmissionRequest {
     @Valid
     private SubmissionRulesRequest rules;
 
-    // TODO File Storage
     private String templateFileName;
+
+    private String instructions;
 }

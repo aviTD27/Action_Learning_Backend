@@ -29,6 +29,8 @@ public class SubmissionResponse {
     private String namingPattern;
     private String requiredHeadings;
     private String templateFileName;
+    private boolean hasTemplate;
+    private String instructions;
     private Instant lastNotifiedAt;
     private Instant createdAt;
 }

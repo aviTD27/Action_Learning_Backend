@@ -6,11 +6,16 @@ import fr.epita.dto.Response.StudentSubmissionResponse;
 import fr.epita.model.AppUser;
 import fr.epita.model.Student;
 import fr.epita.model.Submission;
+import fr.epita.model.SubmissionUpload;
 import fr.epita.repository.StudentRepository;
 import fr.epita.repository.SubmissionRepository;
+import fr.epita.repository.SubmissionUploadRepository;
 import fr.epita.service.SubmissionUploadService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 
 @RestController
@@ -29,6 +35,7 @@ public class SubmissionUploadController {
     private final SubmissionRepository submissionRepository;
     private final StudentRepository studentRepository;
     private final SubmissionUploadService uploadService;
+    private final SubmissionUploadRepository uploadRepository;
 
     @PostMapping(value = "/{submissionId}/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ComplianceReportResponse> uploadDocument(
@@ -59,6 +66,19 @@ public class SubmissionUploadController {
         Submission submission = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> new EntityNotFoundException("Submission not found"));
         return ResponseEntity.ok(uploadService.getStudentSubmissions(submission));
+    }
+
+    @GetMapping("/uploads/{uploadId}/download")
+    public ResponseEntity<Resource> downloadUpload(@PathVariable Long uploadId) {
+        SubmissionUpload upload = uploadRepository.findById(uploadId)
+                .orElseThrow(() -> new EntityNotFoundException("Upload not found"));
+        Resource resource = new FileSystemResource(Path.of(upload.getStoredPath()));
+        if (!resource.exists()) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + upload.getOriginalFileName() + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
     }
 
     @GetMapping("/{submissionId}/my-upload")

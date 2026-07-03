@@ -24,7 +24,6 @@ public class DeadlineReminderScheduler {
 
     private static final Map<NotificationType, Duration> WINDOWS = Map.of(
             NotificationType.REMINDER_24H, Duration.ofHours(24),
-            NotificationType.REMINDER_12H, Duration.ofHours(12),
             NotificationType.REMINDER_1H, Duration.ofHours(1)
     );
 
@@ -56,7 +55,6 @@ public class DeadlineReminderScheduler {
     private String reminderMessage(Submission s, NotificationType type) {
         String left = switch (type) {
             case REMINDER_24H -> "24 hours";
-            case REMINDER_12H -> "12 hours";
             case REMINDER_1H -> "1 hour";
             default -> "";
         };

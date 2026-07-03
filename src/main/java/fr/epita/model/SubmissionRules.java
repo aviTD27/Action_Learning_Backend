@@ -22,6 +22,9 @@ public class SubmissionRules {
 
     private Integer maxWordCount;
 
+    /** Maximum allowed upload size in bytes; null = no explicit limit. */
+    private Long maxFileSizeBytes;
+
     private String namingPattern;
 
     @Column(length = 1000)

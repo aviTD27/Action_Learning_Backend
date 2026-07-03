@@ -15,4 +15,6 @@ public interface SubmissionUploadRepository extends JpaRepository<SubmissionUplo
     Optional<SubmissionUpload> findTopBySubmissionIdAndStudentIdOrderByUploadedAtDesc(Long submissionId, Long studentId);
 
     long countBySubmissionIdAndStudentId(Long submissionId, Long studentId);
+
+    long countBySubmissionId(Long submissionId);
 }

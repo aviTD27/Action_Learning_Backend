@@ -4,6 +4,7 @@ import fr.epita.dto.Request.GradeRequest;
 import fr.epita.dto.Response.GradeResponse;
 import fr.epita.dto.Response.MyGradeResponse;
 import fr.epita.enums.GradeStatus;
+import fr.epita.enums.NotificationType;
 import fr.epita.model.Student;
 import fr.epita.model.StudentGrade;
 import fr.epita.model.Submission;
@@ -16,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -26,6 +28,7 @@ public class GradeService {
     private final StudentGradeRepository studentGradeRepository;
     private final SubmissionRepository submissionRepository;
     private final StudentRepository studentRepository;
+    private final NotificationService notificationService;
 
     public List<GradeResponse> getForSubmission(Long submissionId) {
         findSubmission(submissionId); // 404 when the submission doesn't exist
@@ -64,25 +67,51 @@ public class GradeService {
                         .student(student)
                         .build());
 
+        // Row 111 — editing an already-RELEASED grade keeps it released and notifies the student.
+        boolean wasReleased = grade.getId() != null && grade.getStatus() == GradeStatus.RELEASED;
+
         grade.setGrade(request.getGrade());
         grade.setFeedback(request.getFeedback());
-        grade.setStatus(GradeStatus.DRAFT);
+        grade.setStatus(wasReleased ? GradeStatus.RELEASED : GradeStatus.DRAFT);
         grade.setGradedAt(Instant.now());
+        StudentGrade saved = studentGradeRepository.save(grade);
 
-        return toResponse(studentGradeRepository.save(grade));
+        if (wasReleased) {
+            notificationService.notifyStudent(student, submission, NotificationType.GRADE_UPDATED,
+                    "Your grade for \"" + submission.getTitle() + "\" has been updated to "
+                            + fmt(saved.getGrade()) + " / " + submission.getMaxPoints() + ".");
+        }
+        return toResponse(saved);
     }
 
     @Transactional
     public List<GradeResponse> releaseAll(Long submissionId) {
-        findSubmission(submissionId);
+        Submission submission = findSubmission(submissionId);
         List<StudentGrade> grades = studentGradeRepository.findBySubmissionId(submissionId);
+
+        // Row 110 — only newly released grades trigger a "grade released" notification.
+        List<StudentGrade> newlyReleased = new ArrayList<>();
         for (StudentGrade grade : grades) {
-            grade.setStatus(GradeStatus.RELEASED);
+            if (grade.getStatus() != GradeStatus.RELEASED) {
+                grade.setStatus(GradeStatus.RELEASED);
+                newlyReleased.add(grade);
+            }
         }
-        return studentGradeRepository.saveAll(grades)
+        List<GradeResponse> result = studentGradeRepository.saveAll(grades)
                 .stream()
                 .map(this::toResponse)
                 .toList();
+
+        for (StudentGrade grade : newlyReleased) {
+            notificationService.notifyStudent(grade.getStudent(), submission, NotificationType.GRADE_RELEASED,
+                    "Your grade for \"" + submission.getTitle() + "\" has been released: "
+                            + fmt(grade.getGrade()) + " / " + submission.getMaxPoints() + ".");
+        }
+        return result;
+    }
+
+    private String fmt(double value) {
+        return value == Math.floor(value) ? String.valueOf((long) value) : String.valueOf(value);
     }
 
     private Submission findSubmission(Long id) {

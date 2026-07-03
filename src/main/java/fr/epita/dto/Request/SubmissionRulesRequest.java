@@ -17,6 +17,8 @@ public class SubmissionRulesRequest {
 
     private Integer maxWordCount;
 
+    private Long maxFileSizeBytes;
+
     private String namingPattern;
 
     private String requiredHeadings;

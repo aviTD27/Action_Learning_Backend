@@ -13,8 +13,6 @@ import fr.epita.repository.SubmissionUploadRepository;
 import fr.epita.service.SubmissionUploadService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -68,19 +66,6 @@ public class SubmissionUploadController {
         return ResponseEntity.ok(uploadService.getStudentSubmissions(submission));
     }
 
-    @GetMapping("/uploads/{uploadId}/download")
-    public ResponseEntity<Resource> downloadUpload(@PathVariable Long uploadId) {
-        SubmissionUpload upload = uploadRepository.findById(uploadId)
-                .orElseThrow(() -> new EntityNotFoundException("Upload not found"));
-        Resource resource = new FileSystemResource(Path.of(upload.getStoredPath()));
-        if (!resource.exists()) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + upload.getOriginalFileName() + "\"")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(resource);
-    }
-
     @GetMapping("/{submissionId}/my-upload")
     public ResponseEntity<MyUploadStatusResponse> getMyUploadStatus(
             @PathVariable Long submissionId,
@@ -88,5 +73,58 @@ public class SubmissionUploadController {
         MyUploadStatusResponse status = uploadService.getMyUploadStatus(submissionId, currentUser.getEmail());
         if (status == null) return ResponseEntity.noContent().build();
         return ResponseEntity.ok(status);
+    }
+
+    /** Row 68 — lecturer uploads a template/brief file for the assignment. */
+    @PostMapping(value = "/{submissionId}/template", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Void> uploadTemplate(
+            @PathVariable Long submissionId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        Submission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new EntityNotFoundException("Submission not found"));
+        uploadService.storeTemplate(submission, file);
+        return ResponseEntity.ok().build();
+    }
+
+    /** Row 68 — anyone in the cohort (and the lecturer) downloads the template file. */
+    @GetMapping("/{submissionId}/template")
+    public ResponseEntity<byte[]> downloadTemplate(@PathVariable Long submissionId) throws IOException {
+        Submission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new EntityNotFoundException("Submission not found"));
+        if (submission.getTemplateStoredPath() == null || submission.getTemplateStoredPath().isBlank()) {
+            return ResponseEntity.noContent().build();
+        }
+        byte[] data = uploadService.readBytes(submission.getTemplateStoredPath());
+        return fileResponse(data, submission.getTemplateFileName());
+    }
+
+    /** Row 75 — lecturer downloads a single student's submitted file. */
+    @GetMapping("/uploads/{uploadId}/download")
+    public ResponseEntity<byte[]> downloadUpload(@PathVariable Long uploadId) throws IOException {
+        SubmissionUpload upload = uploadService.getUploadForDownload(uploadId);
+        if (upload.getStoredPath() == null || upload.getStoredPath().isBlank()) {
+            return ResponseEntity.noContent().build();
+        }
+        byte[] data = uploadService.readBytes(upload.getStoredPath());
+        return fileResponse(data, upload.getOriginalFileName());
+    }
+
+    /** Row 76 — lecturer downloads every submission for an assignment as one ZIP. */
+    @GetMapping("/{submissionId}/download-zip")
+    public ResponseEntity<byte[]> downloadZip(@PathVariable Long submissionId) throws IOException {
+        byte[] zip = uploadService.buildSubmissionsZip(submissionId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"submissions-" + submissionId + ".zip\"")
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .body(zip);
+    }
+
+    private ResponseEntity<byte[]> fileResponse(byte[] data, String filename) {
+        String safe = filename != null ? filename : "download";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safe + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(data);
     }
 }

@@ -35,6 +35,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -130,10 +131,17 @@ public class SubmissionService {
     public SubmissionResponse update(Long id, CreateSubmissionRequest request) {
         Submission submission = find(id);
 
-        // Editable until the deadline (row 72): a published assignment past its deadline is locked.
+        // Editable until the deadline (row 72). Once a published assignment is past its deadline
+        // it's locked — EXCEPT the lecturer may re-open it by setting a new due date in the future.
         if (submission.getStatus() == SubmissionStatus.PUBLISHED
                 && LocalDateTime.now().isAfter(submission.deadline())) {
-            throw new IllegalStateException("This assignment's deadline has passed and it can no longer be edited.");
+            LocalDateTime newDeadline = request.getDueDate() != null
+                    ? request.getDueDate().atTime(request.getDueTime() != null ? request.getDueTime() : LocalTime.of(23, 59))
+                    : submission.deadline();
+            if (!newDeadline.isAfter(LocalDateTime.now())) {
+                throw new IllegalStateException(
+                        "This assignment's deadline has passed. Set a new due date in the future to re-open it for editing.");
+            }
         }
 
         Cohort cohort = cohortRepository.findById(

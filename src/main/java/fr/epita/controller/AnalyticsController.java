@@ -1,7 +1,10 @@
 package fr.epita.controller;
 
+import fr.epita.dto.Response.AtRiskStudentResponse;
 import fr.epita.dto.Response.CohortBenchmarkResponse;
 import fr.epita.dto.Response.GradeDistributionResponse;
+import fr.epita.dto.Response.GradingBacklogResponse;
+import fr.epita.dto.Response.LecturerWorkloadResponse;
 import fr.epita.dto.Response.TenantSummaryResponse;
 import fr.epita.dto.Response.TrendPointResponse;
 import fr.epita.model.AppUser;
@@ -47,6 +50,27 @@ public class AnalyticsController {
             @RequestParam(required = false) Long universityId,
             @AuthenticationPrincipal AppUser currentUser) {
         return ResponseEntity.ok(analyticsService.cohortBenchmark(resolve(universityId, currentUser)));
+    }
+
+    @GetMapping("/tenant/grading-backlog")
+    public ResponseEntity<GradingBacklogResponse> gradingBacklog(
+            @RequestParam(required = false) Long universityId,
+            @AuthenticationPrincipal AppUser currentUser) {
+        return ResponseEntity.ok(analyticsService.gradingBacklog(resolve(universityId, currentUser)));
+    }
+
+    @GetMapping("/tenant/at-risk")
+    public ResponseEntity<List<AtRiskStudentResponse>> atRiskStudents(
+            @RequestParam(required = false) Long universityId,
+            @AuthenticationPrincipal AppUser currentUser) {
+        return ResponseEntity.ok(analyticsService.atRiskStudents(resolve(universityId, currentUser)));
+    }
+
+    @GetMapping("/tenant/lecturer-workload")
+    public ResponseEntity<List<LecturerWorkloadResponse>> lecturerWorkload(
+            @RequestParam(required = false) Long universityId,
+            @AuthenticationPrincipal AppUser currentUser) {
+        return ResponseEntity.ok(analyticsService.lecturerWorkload(resolve(universityId, currentUser)));
     }
 
     private Long resolve(Long universityId, AppUser currentUser) {

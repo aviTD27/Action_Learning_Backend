@@ -9,6 +9,7 @@ import org.springframework.security.authentication.DisabledException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.RestClientException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -51,6 +52,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<?> handleConflict(IllegalStateException ex) {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    // AI / compliance service unreachable
+    @ExceptionHandler(RestClientException.class)
+    public ResponseEntity<?> handleRestClient(RestClientException ex) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE,
+                "The compliance service is currently unavailable. Please ensure the AI service is running and try again.");
     }
 
     // Internal Server Error

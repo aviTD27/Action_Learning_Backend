@@ -9,6 +9,7 @@ import fr.epita.model.Submission;
 import fr.epita.model.SubmissionUpload;
 import fr.epita.repository.StudentRepository;
 import fr.epita.repository.SubmissionRepository;
+import fr.epita.repository.SubmissionUploadRepository;
 import fr.epita.service.SubmissionUploadService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 
 @RestController
@@ -31,6 +33,7 @@ public class SubmissionUploadController {
     private final SubmissionRepository submissionRepository;
     private final StudentRepository studentRepository;
     private final SubmissionUploadService uploadService;
+    private final SubmissionUploadRepository uploadRepository;
 
     @PostMapping(value = "/{submissionId}/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ComplianceReportResponse> uploadDocument(

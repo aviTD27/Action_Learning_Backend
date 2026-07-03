@@ -49,4 +49,6 @@ public class CreateSubmissionRequest {
     private SubmissionRulesRequest rules;
 
     private String templateFileName;
+
+    private String instructions;
 }

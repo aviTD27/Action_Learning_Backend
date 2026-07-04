@@ -46,7 +46,7 @@ public class DeadlineReminderScheduler {
 
                 if (remaining.compareTo(window.getValue()) <= 0
                         && !notificationRepository.existsBySubmissionIdAndType(submission.getId(), type)) {
-                    notificationService.notifyCohort(submission, type, reminderMessage(submission, type));
+                    notificationService.notifyCourseStudents(submission, type, reminderMessage(submission, type));
                 }
             }
         }

@@ -7,8 +7,8 @@ import java.util.List;
 
 public interface TimetableEntryRepository extends JpaRepository<TimetableEntry, Long> {
 
-    // Admin: all entries for a university (via cohort → programme → university)
-    List<TimetableEntry> findByCohort_Programme_UniversityId(Long universityId);
+    // Admin: all entries for a university (via cohort → university; cohort is now university-scoped)
+    List<TimetableEntry> findByCohort_UniversityId(Long universityId);
 
     // Student: entries for their specific cohort
     List<TimetableEntry> findByCohortId(Long cohortId);

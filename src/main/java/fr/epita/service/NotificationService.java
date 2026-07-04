@@ -24,9 +24,10 @@ public class NotificationService {
     private final SubmissionUploadRepository uploadRepository;
     private final EmailService emailService;
 
+    /** Notifies every student enrolled in the programme of this assignment's course. */
     @Transactional
-    public void notifyCohort(Submission submission, NotificationType type, String message) {
-        for (Student student : studentRepository.findByCohortId(submission.getCohort().getId())) {
+    public void notifyCourseStudents(Submission submission, NotificationType type, String message) {
+        for (Student student : audienceFor(submission)) {
             notifyStudent(student, submission, type, message);
         }
     }
@@ -47,11 +48,11 @@ public class NotificationService {
         }
     }
 
-    /** Row 113 — notifies only cohort students who have NOT turned in this submission. Returns how many. */
+    /** Row 113 — notifies only course students who have NOT turned in this submission. Returns how many. */
     @Transactional
     public int notifyNonSubmitters(Submission submission, NotificationType type, String message) {
         int count = 0;
-        for (Student student : studentRepository.findByCohortId(submission.getCohort().getId())) {
+        for (Student student : audienceFor(submission)) {
             boolean submitted = uploadRepository
                     .findTopBySubmissionIdAndStudentIdOrderByUploadedAtDesc(submission.getId(), student.getId())
                     .map(u -> Boolean.TRUE.equals(u.getTurnedIn()))
@@ -62,6 +63,14 @@ public class NotificationService {
             }
         }
         return count;
+    }
+
+    /** The audience of an assignment = all students enrolled in the course's programme. */
+    private List<Student> audienceFor(Submission submission) {
+        if (submission.getCourse() == null || submission.getCourse().getProgramme() == null) {
+            return java.util.List.of();
+        }
+        return studentRepository.findByProgrammeId(submission.getCourse().getProgramme().getId());
     }
 
     // ── Student /me methods (look up student by email) ──

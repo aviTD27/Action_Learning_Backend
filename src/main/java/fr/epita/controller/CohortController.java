@@ -27,8 +27,11 @@ public class CohortController {
     }
 
     @PostMapping
-    public ResponseEntity<CohortResponse> create(@Valid @RequestBody CreateCohortRequest request) {
-        return ResponseEntity.ok(cohortService.create(request));
+    public ResponseEntity<CohortResponse> create(
+            @Valid @RequestBody CreateCohortRequest request,
+            @RequestParam(required = false) Long universityId,
+            @AuthenticationPrincipal AppUser currentUser) {
+        return ResponseEntity.ok(cohortService.create(request, resolve(universityId, currentUser)));
     }
 
     @PutMapping("/{id}")

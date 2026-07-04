@@ -8,6 +8,6 @@ import java.util.List;
 public interface AttendanceSessionRepository extends JpaRepository<AttendanceSession, Long> {
     List<AttendanceSession> findByCohortIdOrderBySessionDateDesc(Long cohortId);
     List<AttendanceSession> findByLecturerIdOrderBySessionDateDesc(Long lecturerId);
-    List<AttendanceSession> findByCohort_Programme_UniversityIdOrderBySessionDateDesc(Long universityId);
+    List<AttendanceSession> findByCohort_UniversityIdOrderBySessionDateDesc(Long universityId);
     long countByCohortId(Long cohortId);
 }

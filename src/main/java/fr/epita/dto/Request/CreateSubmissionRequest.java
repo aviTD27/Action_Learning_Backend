@@ -21,11 +21,11 @@ public class CreateSubmissionRequest {
     /** Free-text notes shown alongside the assignment. */
     private String additionalNotes;
 
-    /** Single cohort (kept for backward compatibility). */
-    private Long cohortId;
+    /** Single course the assignment belongs to. */
+    private Long courseId;
 
-    /** One or more cohorts to assign to; when set, one assignment is created per cohort. */
-    private List<Long> cohortIds;
+    /** One or more courses to assign to; when set, one assignment is created per course. */
+    private List<Long> courseIds;
 
     private Long lecturerId;
 

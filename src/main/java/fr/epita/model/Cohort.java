@@ -1,12 +1,18 @@
 package fr.epita.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import fr.epita.enums.CohortSeason;
 import fr.epita.enums.CohortStatus;
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDateTime;
+
 import java.util.List;
 
+/**
+ * A Cohort is now an INTAKE SEASON (e.g. "Spring 2026") that is university-wide.
+ * Programmes are attached to a cohort via a many-to-many relationship, and students
+ * belong to a cohort intake. (Previously a cohort belonged to a single programme.)
+ */
 @Entity
 @Getter
 @Setter
@@ -20,31 +26,38 @@ public class Cohort {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Display name, e.g. "Spring 2026". */
     @Column(nullable = false)
     private String name;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "VARCHAR(20)")
+    private CohortSeason season;
+
+    @Column(nullable = false)
+    private int academicYear;
+
+    /** A cohort is now directly scoped to a university (no longer via a programme). */
     @ManyToOne
-    @JoinColumn(name = "programme_id", nullable = false)
-    private Programme programme;
+    @JoinColumn(name = "university_id", nullable = false)
+    private University university;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, columnDefinition = "VARCHAR(50)")
     private CohortStatus status = CohortStatus.NOT_STARTED;
 
+    /** Programmes that run in this intake (inverse side; join table owned by Programme). */
+    @ManyToMany(mappedBy = "cohorts")
+    @JsonIgnore
+    private List<Programme> programmes;
+
+    /** Students who belong to this intake. */
     @OneToMany(mappedBy = "cohort")
     @JsonIgnore
     private List<Student> students;
 
-    /** Lecturers assigned to teach this cohort. */
-    @ManyToMany
-    @JoinTable(
-            name = "cohort_lecturers",
-            joinColumns = @JoinColumn(name = "cohort_id"),
-            inverseJoinColumns = @JoinColumn(name = "lecturer_id")
-    )
-    private List<Lecturer> lecturers;
-
-    // TODO Add University relationship
-
+    @PrePersist
+    void onCreate() {
+        if (status == null) status = CohortStatus.NOT_STARTED;
+    }
 }
-

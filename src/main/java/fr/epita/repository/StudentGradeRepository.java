@@ -13,6 +13,6 @@ public interface StudentGradeRepository extends JpaRepository<StudentGrade, Long
     void deleteBySubmissionId(Long submissionId);
     List<StudentGrade> findByStudentEmailAndStatus(String email, GradeStatus status);
 
-    // Analytics: all grades belonging to a university (submission -> cohort -> programme -> university)
-    List<StudentGrade> findBySubmission_Cohort_Programme_University_Id(Long universityId);
+    // Analytics: all grades belonging to a university (submission -> course -> programme -> university)
+    List<StudentGrade> findBySubmission_Course_Programme_University_Id(Long universityId);
 }

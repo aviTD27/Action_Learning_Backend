@@ -3,15 +3,15 @@ package fr.epita.service;
 import fr.epita.dto.Request.CreateSubmissionRequest;
 import fr.epita.dto.Request.SubmissionRulesRequest;
 import fr.epita.dto.Response.SubmissionResponse;
-import fr.epita.enums.CohortStatus;
+import fr.epita.enums.CourseStatus;
 import fr.epita.enums.NotificationType;
 import fr.epita.enums.SubmissionStatus;
 import fr.epita.enums.SubmissionType;
-import fr.epita.model.Cohort;
+import fr.epita.model.Course;
 import fr.epita.model.Lecturer;
 import fr.epita.model.Submission;
 import fr.epita.model.SubmissionRules;
-import fr.epita.repository.CohortRepository;
+import fr.epita.repository.CourseRepository;
 import fr.epita.repository.LecturerRepository;
 import fr.epita.repository.StudentGradeRepository;
 import fr.epita.repository.SubmissionRepository;
@@ -46,7 +46,7 @@ public class SubmissionService {
     private final SubmissionRepository submissionRepository;
     private final StudentGradeRepository studentGradeRepository;
     private final SubmissionUploadRepository uploadRepository;
-    private final CohortRepository cohortRepository;
+    private final CourseRepository courseRepository;
     private final LecturerRepository lecturerRepository;
     private final NotificationService notificationService;
 
@@ -54,16 +54,23 @@ public class SubmissionService {
     private String uploadDir;
 
     /**
-     * @param studentView when true, only PUBLISHED assignments are returned (drafts/archived are hidden).
+     * @param courseId     when set, assignments of a single course
+     * @param lecturerId   when set, assignments a lecturer owns
+     * @param universityId when set, all assignments in a university (course -> programme -> university)
+     * @param programmeId  when set, all assignments of a programme (student view)
+     * @param studentView  when true, only PUBLISHED assignments are returned (drafts/archived hidden).
      */
-    public List<SubmissionResponse> getAll(Long cohortId, Long lecturerId, Long universityId, boolean studentView) {
+    public List<SubmissionResponse> getAll(Long courseId, Long lecturerId, Long universityId,
+                                           Long programmeId, boolean studentView) {
         List<Submission> submissions;
-        if (cohortId != null) {
-            submissions = submissionRepository.findByCohortId(cohortId);
+        if (courseId != null) {
+            submissions = submissionRepository.findByCourseId(courseId);
         } else if (lecturerId != null) {
             submissions = submissionRepository.findByLecturerId(lecturerId);
+        } else if (programmeId != null) {
+            submissions = submissionRepository.findByCourse_Programme_Id(programmeId);
         } else if (universityId != null) {
-            submissions = submissionRepository.findByCohort_Programme_University_Id(universityId);
+            submissions = submissionRepository.findByCourse_Programme_University_Id(universityId);
         } else {
             submissions = submissionRepository.findAll();
         }
@@ -79,25 +86,30 @@ public class SubmissionService {
 
     @Transactional
     public SubmissionResponse create(CreateSubmissionRequest request) {
-        // Support "one or more cohorts": create one assignment per selected cohort.
-        List<Long> cohortIds = (request.getCohortIds() != null && !request.getCohortIds().isEmpty())
-                ? request.getCohortIds()
-                : List.of(request.getCohortId());
+        // Support "one or more courses": create one assignment per selected course.
+        List<Long> courseIds = (request.getCourseIds() != null && !request.getCourseIds().isEmpty())
+                ? request.getCourseIds()
+                : List.of(request.getCourseId());
 
-        if (cohortIds.isEmpty() || cohortIds.get(0) == null) {
-            throw new IllegalStateException("At least one cohort is required");
+        if (courseIds.isEmpty() || courseIds.get(0) == null) {
+            throw new IllegalStateException("At least one course is required");
         }
 
         SubmissionStatus status = request.getStatus() != null ? request.getStatus() : SubmissionStatus.DRAFT;
         SubmissionType type = request.getSubmissionType() != null ? request.getSubmissionType() : SubmissionType.BOTH;
 
         List<Submission> created = new ArrayList<>();
-        for (Long cid : cohortIds) {
-            Cohort cohort = cohortRepository.findById(cid)
-                    .orElseThrow(() -> new EntityNotFoundException("Cohort not found"));
-            if (cohort.getStatus() != CohortStatus.ONGOING) {
-                throw new IllegalStateException("Cohort \"" + cohort.getName() + "\" is not ongoing");
+        for (Long cid : courseIds) {
+            Course course = courseRepository.findById(cid)
+                    .orElseThrow(() -> new EntityNotFoundException("Course not found"));
+            if (course.getStatus() == CourseStatus.ARCHIVED) {
+                throw new IllegalStateException("Course \"" + course.getName() + "\" is archived");
             }
+
+            // Default the assignment's lecturer to the course's teaching lecturer when not supplied.
+            Long lecturerId = request.getLecturerId() != null
+                    ? request.getLecturerId()
+                    : (course.getLecturer() != null ? course.getLecturer().getId() : null);
 
             Submission submission = Submission.builder()
                     .title(request.getTitle())
@@ -106,8 +118,8 @@ public class SubmissionService {
                     .additionalNotes(request.getAdditionalNotes())
                     .submissionType(type)
                     .status(status)
-                    .cohort(cohort)
-                    .lecturer(resolveLecturer(request.getLecturerId()))
+                    .course(course)
+                    .lecturer(resolveLecturer(lecturerId))
                     .dueDate(request.getDueDate())
                     .dueTime(request.getDueTime())
                     .maxPoints(request.getMaxPoints())
@@ -117,9 +129,8 @@ public class SubmissionService {
 
             Submission saved = submissionRepository.save(submission);
 
-            // Only a published assignment is visible to — and notified to — students.
             if (status == SubmissionStatus.PUBLISHED) {
-                notificationService.notifyCohort(saved, NotificationType.NEW_SUBMISSION,
+                notificationService.notifyCourseStudents(saved, NotificationType.NEW_SUBMISSION,
                         "New assignment: \"" + saved.getTitle() + "\" — due " + saved.deadline() + ".");
             }
             created.add(saved);
@@ -131,8 +142,6 @@ public class SubmissionService {
     public SubmissionResponse update(Long id, CreateSubmissionRequest request) {
         Submission submission = find(id);
 
-        // Editable until the deadline (row 72). Once a published assignment is past its deadline
-        // it's locked — EXCEPT the lecturer may re-open it by setting a new due date in the future.
         if (submission.getStatus() == SubmissionStatus.PUBLISHED
                 && LocalDateTime.now().isAfter(submission.deadline())) {
             LocalDateTime newDeadline = request.getDueDate() != null
@@ -144,16 +153,16 @@ public class SubmissionService {
             }
         }
 
-        Cohort cohort = cohortRepository.findById(
-                        request.getCohortId() != null ? request.getCohortId() : submission.getCohort().getId())
-                .orElseThrow(() -> new EntityNotFoundException("Cohort not found"));
+        Course course = courseRepository.findById(
+                        request.getCourseId() != null ? request.getCourseId() : submission.getCourse().getId())
+                .orElseThrow(() -> new EntityNotFoundException("Course not found"));
 
         submission.setTitle(request.getTitle());
         submission.setDescription(request.getDescription());
         submission.setInstructions(request.getInstructions());
         submission.setAdditionalNotes(request.getAdditionalNotes());
         if (request.getSubmissionType() != null) submission.setSubmissionType(request.getSubmissionType());
-        submission.setCohort(cohort);
+        submission.setCourse(course);
         submission.setDueDate(request.getDueDate());
         submission.setDueTime(request.getDueTime());
         submission.setMaxPoints(request.getMaxPoints());
@@ -165,9 +174,8 @@ public class SubmissionService {
 
         Submission saved = submissionRepository.save(submission);
 
-        // Rows 72 & 112 — if students have already submitted, an edit notifies the affected students.
         if (uploadRepository.countBySubmissionId(saved.getId()) > 0) {
-            notificationService.notifyCohort(saved, NotificationType.ASSIGNMENT_EDITED,
+            notificationService.notifyCourseStudents(saved, NotificationType.ASSIGNMENT_EDITED,
                     "Assignment updated: \"" + saved.getTitle() + "\". The instructions changed — please review.");
             saved.setLastNotifiedAt(Instant.now());
             saved = submissionRepository.save(saved);
@@ -175,18 +183,16 @@ public class SubmissionService {
         return toResponse(saved);
     }
 
-    /** Publishes a draft assignment — becomes visible to the cohort and notifies students (row 71). */
     @Transactional
     public SubmissionResponse publish(Long id) {
         Submission submission = find(id);
         submission.setStatus(SubmissionStatus.PUBLISHED);
         Submission saved = submissionRepository.save(submission);
-        notificationService.notifyCohort(saved, NotificationType.NEW_SUBMISSION,
+        notificationService.notifyCourseStudents(saved, NotificationType.NEW_SUBMISSION,
                 "New assignment: \"" + saved.getTitle() + "\" — due " + saved.deadline() + ".");
         return toResponse(saved);
     }
 
-    /** Archives an assignment — hidden from students but kept for reference (row 73). */
     @Transactional
     public SubmissionResponse archive(Long id) {
         Submission submission = find(id);
@@ -194,7 +200,6 @@ public class SubmissionService {
         return toResponse(submissionRepository.save(submission));
     }
 
-    /** Restores an archived assignment back to published (visible again, no re-notification). */
     @Transactional
     public SubmissionResponse unarchive(Long id) {
         Submission submission = find(id);
@@ -205,10 +210,6 @@ public class SubmissionService {
         return toResponse(submissionRepository.save(submission));
     }
 
-    /**
-     * Delete vs archive (row 73): unpublished (draft) assignments can be deleted;
-     * a published assignment that already has submissions can only be archived.
-     */
     @Transactional
     public void delete(Long id) {
         Submission submission = find(id);
@@ -221,7 +222,6 @@ public class SubmissionService {
         submissionRepository.delete(submission);
     }
 
-    /** Re-opens a closed assignment for one student as a late exception (row 77). */
     @Transactional
     public SubmissionResponse reopenForStudent(Long id, Long studentId) {
         Submission submission = find(id);
@@ -229,7 +229,6 @@ public class SubmissionService {
         return toResponse(submissionRepository.save(submission));
     }
 
-    /** Row 113 — manual reminder sent only to students who have NOT yet submitted. */
     @Transactional
     public SubmissionResponse notifyStudents(Long id) {
         Submission submission = find(id);
@@ -294,6 +293,7 @@ public class SubmissionService {
 
     private SubmissionResponse toResponse(Submission s) {
         SubmissionRules r = s.getRules();
+        Course course = s.getCourse();
         return SubmissionResponse.builder()
                 .id(s.getId())
                 .title(s.getTitle())
@@ -302,8 +302,10 @@ public class SubmissionService {
                 .additionalNotes(s.getAdditionalNotes())
                 .submissionType(s.getSubmissionType() != null ? s.getSubmissionType().name() : SubmissionType.BOTH.name())
                 .status(s.getStatus() != null ? s.getStatus().name() : SubmissionStatus.PUBLISHED.name())
-                .cohortId(s.getCohort().getId())
-                .cohortName(s.getCohort().getName())
+                .courseId(course != null ? course.getId() : null)
+                .courseName(course != null ? course.getName() : null)
+                .programmeId(course != null && course.getProgramme() != null ? course.getProgramme().getId() : null)
+                .programmeName(course != null && course.getProgramme() != null ? course.getProgramme().getName() : null)
                 .lecturerId(s.getLecturer() != null ? s.getLecturer().getId() : null)
                 .dueDate(s.getDueDate())
                 .dueTime(s.getDueTime())

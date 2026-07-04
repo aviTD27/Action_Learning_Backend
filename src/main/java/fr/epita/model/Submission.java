@@ -44,9 +44,10 @@ public class Submission {
     @Column(columnDefinition = "VARCHAR(20)")
     private SubmissionStatus status = SubmissionStatus.DRAFT;
 
+    /** Assignments now belong to a Course (not a cohort). */
     @ManyToOne
-    @JoinColumn(name = "cohort_id", nullable = false)
-    private Cohort cohort;
+    @JoinColumn(name = "course_id", nullable = false)
+    private Course course;
 
     @ManyToOne
     @JoinColumn(name = "lecturer_id")

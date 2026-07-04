@@ -134,13 +134,11 @@ public class LecturerService {
 
         lecturer.setFirstName(request.getFirstName());
         lecturer.setLastName(request.getLastName());
-        if (request.getEmail() != null && !request.getEmail().isBlank()) {
-            lecturer.setEmail(request.getEmail());
-        }
+        // The professional login email and lecturer ref are fixed at creation and must never
+        // change on edit (login identity / stable reference). Only name and phone are editable.
         if (request.getPhone() != null) {
             lecturer.setPhone(request.getPhone());
         }
-        lecturer.setLecturerRef(request.getLecturerRef());
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             lecturer.setPassword(request.getPassword());
         }

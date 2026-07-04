@@ -25,12 +25,14 @@ public class SubmissionController {
 
     @GetMapping
     public ResponseEntity<List<SubmissionResponse>> getAll(
-            @RequestParam(required = false) Long cohortId,
+            @RequestParam(required = false) Long courseId,
             @RequestParam(required = false) Long lecturerId,
+            @RequestParam(required = false) Long programmeId,
             @AuthenticationPrincipal AppUser currentUser) {
         Long universityId = currentUser != null ? currentUser.getUniversityId() : null;
         boolean studentView = currentUser != null && currentUser.getRole() == Role.ROLE_STUDENT;
-        return ResponseEntity.ok(submissionService.getAll(cohortId, lecturerId, universityId, studentView));
+        return ResponseEntity.ok(
+                submissionService.getAll(courseId, lecturerId, universityId, programmeId, studentView));
     }
 
     @GetMapping("/{id}")

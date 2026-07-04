@@ -51,9 +51,11 @@ public class GradeService {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new EntityNotFoundException("Student not found"));
 
-        if (!Objects.equals(student.getCohort() != null ? student.getCohort().getId() : null,
-                submission.getCohort().getId())) {
-            throw new IllegalStateException("Student is not in this submission's cohort");
+        Long studentProgrammeId = student.getProgramme() != null ? student.getProgramme().getId() : null;
+        Long submissionProgrammeId = submission.getCourse() != null && submission.getCourse().getProgramme() != null
+                ? submission.getCourse().getProgramme().getId() : null;
+        if (!Objects.equals(studentProgrammeId, submissionProgrammeId)) {
+            throw new IllegalStateException("Student is not enrolled in this assignment's programme");
         }
         if (request.getGrade() < 0 || request.getGrade() > submission.getMaxPoints()) {
             throw new IllegalStateException(

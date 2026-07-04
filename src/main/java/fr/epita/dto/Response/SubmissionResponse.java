@@ -20,8 +20,10 @@ public class SubmissionResponse {
     private String additionalNotes;
     private String submissionType;
     private String status;
-    private Long cohortId;
-    private String cohortName;
+    private Long courseId;
+    private String courseName;
+    private Long programmeId;
+    private String programmeName;
     private Long lecturerId;
     private LocalDate dueDate;
     private LocalTime dueTime;

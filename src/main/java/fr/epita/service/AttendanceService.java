@@ -68,7 +68,7 @@ public class AttendanceService {
         } else {
             Long uniId = currentUser.getUniversityId();
             sessions = uniId != null
-                    ? sessionRepository.findByCohort_Programme_UniversityIdOrderBySessionDateDesc(uniId)
+                    ? sessionRepository.findByCohort_UniversityIdOrderBySessionDateDesc(uniId)
                     : sessionRepository.findAll();
         }
 
@@ -204,7 +204,7 @@ public class AttendanceService {
         return StudentAttendanceStatsResponse.CohortStats.builder()
                 .cohortId(cohort.getId())
                 .cohortName(cohort.getName())
-                .programmeName(cohort.getProgramme().getName())
+                .programmeName(null)
                 .totalSessions((int) totalSessions)
                 .present(present)
                 .late(late)
@@ -259,7 +259,7 @@ public class AttendanceService {
     private void validateCohortUniversity(Cohort cohort, AppUser currentUser) {
         Long uniId = currentUser.getUniversityId();
         if (uniId == null) return;
-        Long cohortUniId = cohort.getProgramme().getUniversity().getId();
+        Long cohortUniId = cohort.getUniversity().getId();
         if (!cohortUniId.equals(uniId)) {
             throw new AccessDeniedException("Access denied: cohort belongs to a different university");
         }

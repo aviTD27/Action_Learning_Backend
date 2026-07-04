@@ -3,6 +3,8 @@ package fr.epita.dto.Response;
 import fr.epita.enums.ProgrammeStatus;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class ProgrammeResponse {
 
@@ -13,4 +15,10 @@ public class ProgrammeResponse {
     private Long universityId;
     private String universityName;
     private ProgrammeStatus status;
+
+    /** Cohorts (intakes) this programme is attached to. */
+    private List<Long> cohortIds;
+    private List<String> cohortNames;
+
+    private int semesterCount;
 }

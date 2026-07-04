@@ -20,6 +20,7 @@ import fr.epita.model.StudentGrade;
 import fr.epita.model.Submission;
 import fr.epita.model.SubmissionUpload;
 import fr.epita.repository.CohortRepository;
+import fr.epita.repository.CourseRepository;
 import fr.epita.repository.LecturerRepository;
 import fr.epita.repository.ProgrammeRepository;
 import fr.epita.repository.StudentGradeRepository;
@@ -59,6 +60,7 @@ public class AnalyticsService {
     private final LecturerRepository lecturerRepository;
     private final ProgrammeRepository programmeRepository;
     private final CohortRepository cohortRepository;
+    private final CourseRepository courseRepository;
     private final SubmissionRepository submissionRepository;
     private final StudentGradeRepository studentGradeRepository;
     private final SubmissionUploadRepository uploadRepository;
@@ -73,8 +75,8 @@ public class AnalyticsService {
         long activeLecturers = lecturerRepository.findDistinctByProgrammes_UniversityId(universityId).stream()
                 .filter(l -> l.getStatus() == LecturerStatus.ACTIVE).count();
         long totalProgrammes = programmeRepository.findByUniversityId(universityId).size();
-        List<Cohort> cohorts = cohortRepository.findByProgramme_UniversityId(universityId);
-        long totalSubmissions = submissionRepository.findByCohort_Programme_University_Id(universityId).size();
+        List<Cohort> cohorts = cohortRepository.findByUniversityId(universityId);
+        long totalSubmissions = submissionRepository.findByCourse_Programme_University_Id(universityId).size();
 
         List<StudentGrade> released = releasedGrades(universityId);
         YearMonth thisMonth = YearMonth.now(ZONE);
@@ -105,7 +107,7 @@ public class AnalyticsService {
     public List<TrendPointResponse> tenantTrends(Long universityId) {
         requireUniversity(universityId);
 
-        List<Submission> submissions = submissionRepository.findByCohort_Programme_University_Id(universityId);
+        List<Submission> submissions = submissionRepository.findByCourse_Programme_University_Id(universityId);
         List<StudentGrade> released = releasedGrades(universityId);
 
         List<TrendPointResponse> series = new ArrayList<>();
@@ -159,31 +161,35 @@ public class AnalyticsService {
     public List<CohortBenchmarkResponse> cohortBenchmark(Long universityId) {
         requireUniversity(universityId);
 
-        List<Cohort> cohorts = cohortRepository.findByProgramme_UniversityId(universityId);
+        List<Cohort> cohorts = cohortRepository.findByUniversityId(universityId);
         List<Student> students = studentRepository.findByProgramme_UniversityId(universityId);
-        List<Submission> submissions = submissionRepository.findByCohort_Programme_University_Id(universityId);
+        List<Submission> submissions = submissionRepository.findByCourse_Programme_University_Id(universityId);
         List<StudentGrade> released = releasedGrades(universityId);
 
         List<CohortBenchmarkResponse> rows = new ArrayList<>();
         for (Cohort c : cohorts) {
             Long cid = c.getId();
+            List<fr.epita.model.Programme> cohortProgrammes = programmeRepository.findByCohorts_Id(cid);
+            Set<Long> progIds = cohortProgrammes.stream()
+                    .map(fr.epita.model.Programme::getId).collect(Collectors.toSet());
+            String progNames = cohortProgrammes.stream()
+                    .map(fr.epita.model.Programme::getName).collect(Collectors.joining(", "));
 
             long cohortStudents = students.stream()
                     .filter(s -> s.getCohort() != null && cid.equals(s.getCohort().getId()))
                     .count();
             long cohortSubs = submissions.stream()
-                    .filter(s -> s.getCohort() != null && cid.equals(s.getCohort().getId()))
+                    .filter(s -> progIds.contains(progIdOf(s)))
                     .count();
             List<StudentGrade> cohortGrades = released.stream()
-                    .filter(g -> g.getSubmission() != null && g.getSubmission().getCohort() != null
-                            && cid.equals(g.getSubmission().getCohort().getId()))
+                    .filter(g -> g.getSubmission() != null && progIds.contains(progIdOf(g.getSubmission())))
                     .toList();
             double avg = cohortGrades.stream().mapToDouble(this::scorePct).average().orElse(0.0);
 
             rows.add(CohortBenchmarkResponse.builder()
                     .cohortId(cid)
                     .cohortName(c.getName())
-                    .programmeName(c.getProgramme() != null ? c.getProgramme().getName() : null)
+                    .programmeName(progNames.isBlank() ? null : progNames)
                     .students(cohortStudents)
                     .submissions(cohortSubs)
                     .releasedGrades(cohortGrades.size())
@@ -202,7 +208,7 @@ public class AnalyticsService {
     @Transactional(readOnly = true)
     public GradingBacklogResponse gradingBacklog(Long universityId) {
         requireUniversity(universityId);
-        List<Submission> submissions = submissionRepository.findByCohort_Programme_University_Id(universityId);
+        List<Submission> submissions = submissionRepository.findByCourse_Programme_University_Id(universityId);
         Set<String> releasedKeys = releasedKeys(universityId);
         Set<String> turnedInKeys = turnedInKeys(submissions);
         long awaiting = turnedInKeys.stream().filter(k -> !releasedKeys.contains(k)).count();
@@ -218,7 +224,7 @@ public class AnalyticsService {
     public List<AtRiskStudentResponse> atRiskStudents(Long universityId) {
         requireUniversity(universityId);
         List<Student> students = studentRepository.findByProgramme_UniversityId(universityId);
-        List<Submission> submissions = submissionRepository.findByCohort_Programme_University_Id(universityId);
+        List<Submission> submissions = submissionRepository.findByCourse_Programme_University_Id(universityId);
         List<StudentGrade> released = releasedGrades(universityId);
         Set<String> turnedInKeys = turnedInKeys(submissions);
         LocalDateTime now = LocalDateTime.now();
@@ -226,7 +232,7 @@ public class AnalyticsService {
         List<AtRiskStudentResponse> out = new ArrayList<>();
         for (Student st : students) {
             Long sid = st.getId();
-            Long cohortId = st.getCohort() != null ? st.getCohort().getId() : null;
+            Long progId = st.getProgramme() != null ? st.getProgramme().getId() : null;
 
             List<StudentGrade> myGrades = released.stream()
                     .filter(g -> g.getStudent() != null && sid.equals(g.getStudent().getId()))
@@ -235,9 +241,9 @@ public class AnalyticsService {
                     : round1(myGrades.stream().mapToDouble(this::scorePct).average().orElse(0.0));
 
             long missed = 0;
-            if (cohortId != null) {
+            if (progId != null) {
                 for (Submission s : submissions) {
-                    if (s.getCohort() == null || !cohortId.equals(s.getCohort().getId())) continue;
+                    if (!progId.equals(progIdOf(s))) continue;
                     if (s.getStatus() != SubmissionStatus.PUBLISHED) continue;
                     if (!now.isAfter(s.deadline())) continue; // deadline not passed yet
                     if (!turnedInKeys.contains(s.getId() + ":" + sid)) missed++;
@@ -278,8 +284,8 @@ public class AnalyticsService {
     public List<LecturerWorkloadResponse> lecturerWorkload(Long universityId) {
         requireUniversity(universityId);
         List<Lecturer> lecturers = lecturerRepository.findDistinctByProgrammes_UniversityId(universityId);
-        List<Submission> submissions = submissionRepository.findByCohort_Programme_University_Id(universityId);
-        List<Cohort> cohorts = cohortRepository.findByProgramme_UniversityId(universityId);
+        List<Submission> submissions = submissionRepository.findByCourse_Programme_University_Id(universityId);
+        List<Cohort> cohorts = cohortRepository.findByUniversityId(universityId);
         Set<String> releasedKeys = releasedKeys(universityId);
 
         List<LecturerWorkloadResponse> out = new ArrayList<>();
@@ -288,10 +294,7 @@ public class AnalyticsService {
             List<Submission> mySubs = submissions.stream()
                     .filter(s -> s.getLecturer() != null && lid.equals(s.getLecturer().getId()))
                     .toList();
-            long cohortsTaught = cohorts.stream()
-                    .filter(c -> c.getLecturers() != null
-                            && c.getLecturers().stream().anyMatch(x -> lid.equals(x.getId())))
-                    .count();
+            long coursesTaught = courseRepository.findByLecturerId(lid).size();
             Set<String> myTurnedIn = turnedInKeys(mySubs);
             long backlog = myTurnedIn.stream().filter(k -> !releasedKeys.contains(k)).count();
 
@@ -299,7 +302,7 @@ public class AnalyticsService {
                     .lecturerId(lid)
                     .lecturerName(l.getFirstName() + " " + l.getLastName())
                     .assignments(mySubs.size())
-                    .cohorts(cohortsTaught)
+                    .cohorts(coursesTaught)
                     .gradingBacklog(backlog)
                     .build());
         }
@@ -321,7 +324,7 @@ public class AnalyticsService {
         List<Submission> subs = submissionRepository.findByLecturerId(lid);
 
         List<StudentGrade> allUniGrades = (universityId != null)
-                ? studentGradeRepository.findBySubmission_Cohort_Programme_University_Id(universityId)
+                ? studentGradeRepository.findBySubmission_Course_Programme_University_Id(universityId)
                 : new ArrayList<>();
         List<StudentGrade> myGrades = allUniGrades.stream()
                 .filter(g -> g.getSubmission() != null && g.getSubmission().getLecturer() != null
@@ -374,7 +377,7 @@ public class AnalyticsService {
                 needs.add(LecturerOverviewResponse.NeedsGradingItem.builder()
                         .submissionId(s.getId())
                         .title(s.getTitle())
-                        .cohortName(s.getCohort() != null ? s.getCohort().getName() : null)
+                        .cohortName(s.getCourse() != null ? s.getCourse().getName() : null)
                         .awaiting(awaiting)
                         .oldestSubmittedAt(oldest != null ? oldest.toString() : null)
                         .build());
@@ -399,11 +402,11 @@ public class AnalyticsService {
         List<StudentGrade> released = myGrades.stream().filter(g -> g.getStatus() == GradeStatus.RELEASED).toList();
         List<GradeDistributionResponse> dist = bandGrades(released);
 
-        Set<Long> cohortIds = subs.stream()
-                .map(s -> s.getCohort() != null ? s.getCohort().getId() : null)
+        Set<Long> programmeIds = subs.stream()
+                .map(this::progIdOf)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        List<AtRiskStudentResponse> atRisk = atRiskForCohorts(cohortIds, subs, released);
+        List<AtRiskStudentResponse> atRisk = atRiskForProgrammes(programmeIds, subs, released);
 
         return LecturerOverviewResponse.builder()
                 .gradingBacklog(backlog)
@@ -418,15 +421,15 @@ public class AnalyticsService {
                 .build();
     }
 
-    private List<AtRiskStudentResponse> atRiskForCohorts(Set<Long> cohortIds, List<Submission> subs,
+    private List<AtRiskStudentResponse> atRiskForProgrammes(Set<Long> programmeIds, List<Submission> subs,
                                                          List<StudentGrade> released) {
-        if (cohortIds.isEmpty()) return List.of();
+        if (programmeIds.isEmpty()) return List.of();
         Set<String> turnedInKeys = turnedInKeys(subs);
         LocalDateTime now = LocalDateTime.now();
 
         Map<Long, Student> studentMap = new LinkedHashMap<>();
-        for (Long cid : cohortIds) {
-            for (Student st : studentRepository.findByCohortId(cid)) studentMap.putIfAbsent(st.getId(), st);
+        for (Long pid : programmeIds) {
+            for (Student st : studentRepository.findByProgrammeId(pid)) studentMap.putIfAbsent(st.getId(), st);
         }
 
         List<AtRiskStudentResponse> out = new ArrayList<>();
@@ -439,10 +442,10 @@ public class AnalyticsService {
                     : round1(myG.stream().mapToDouble(this::scorePct).average().orElse(0.0));
 
             long missed = 0;
-            Long cohortId = st.getCohort() != null ? st.getCohort().getId() : null;
-            if (cohortId != null) {
+            Long progId = st.getProgramme() != null ? st.getProgramme().getId() : null;
+            if (progId != null) {
                 for (Submission s : subs) {
-                    if (s.getCohort() == null || !cohortId.equals(s.getCohort().getId())) continue;
+                    if (!progId.equals(progIdOf(s))) continue;
                     if (s.getStatus() != SubmissionStatus.PUBLISHED) continue;
                     if (!now.isAfter(s.deadline())) continue;
                     if (!turnedInKeys.contains(s.getId() + ":" + sid)) missed++;
@@ -521,7 +524,7 @@ public class AnalyticsService {
     }
 
     private List<StudentGrade> releasedGrades(Long universityId) {
-        return studentGradeRepository.findBySubmission_Cohort_Programme_University_Id(universityId).stream()
+        return studentGradeRepository.findBySubmission_Course_Programme_University_Id(universityId).stream()
                 .filter(g -> g.getStatus() == GradeStatus.RELEASED)
                 .toList();
     }
@@ -544,9 +547,16 @@ public class AnalyticsService {
         return Math.round(v * 10.0) / 10.0;
     }
 
+    /** Programme id an assignment belongs to (via its course). */
+    private Long progIdOf(Submission s) {
+        return s.getCourse() != null && s.getCourse().getProgramme() != null
+                ? s.getCourse().getProgramme().getId() : null;
+    }
+
     private void requireUniversity(Long universityId) {
-        if (universityId == null) {
-            throw new IllegalArgumentException("A university context is required for analytics.");
-        }
+        // Intentionally a no-op. When there is no university context (e.g. an
+        // unauthenticated or platform-level request that fires during page load),
+        // the queries below simply match nothing and analytics return empty/zero
+        // results, instead of failing the request with a 500.
     }
 }

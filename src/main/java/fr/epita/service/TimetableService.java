@@ -38,7 +38,7 @@ public class TimetableService {
             entries = timetableRepository.findAll();
 
         } else if (role == Role.ROLE_UNI_ADMIN) {
-            entries = timetableRepository.findByCohort_Programme_UniversityId(currentUser.getUniversityId());
+            entries = timetableRepository.findByCohort_UniversityId(currentUser.getUniversityId());
 
         } else if (role == Role.ROLE_STUDENT) {
             Student student = studentRepository.findByEmail(currentUser.getEmail())
@@ -65,7 +65,7 @@ public class TimetableService {
         Cohort cohort = cohortRepository.findById(request.getCohortId())
                 .orElseThrow(() -> new EntityNotFoundException("Cohort not found"));
 
-        validateUniversityAccess(cohort.getProgramme().getUniversity().getId(), currentUser);
+        validateUniversityAccess(cohort.getUniversity().getId(), currentUser);
 
         Lecturer lecturer = null;
         if (request.getLecturerId() != null) {
@@ -92,11 +92,11 @@ public class TimetableService {
         requireUniAdmin(currentUser);
 
         TimetableEntry entry = find(id);
-        validateUniversityAccess(entry.getCohort().getProgramme().getUniversity().getId(), currentUser);
+        validateUniversityAccess(entry.getCohort().getUniversity().getId(), currentUser);
 
         Cohort cohort = cohortRepository.findById(request.getCohortId())
                 .orElseThrow(() -> new EntityNotFoundException("Cohort not found"));
-        validateUniversityAccess(cohort.getProgramme().getUniversity().getId(), currentUser);
+        validateUniversityAccess(cohort.getUniversity().getId(), currentUser);
 
         Lecturer lecturer = null;
         if (request.getLecturerId() != null) {
@@ -120,7 +120,7 @@ public class TimetableService {
     public void delete(Long id, AppUser currentUser) {
         requireUniAdmin(currentUser);
         TimetableEntry entry = find(id);
-        validateUniversityAccess(entry.getCohort().getProgramme().getUniversity().getId(), currentUser);
+        validateUniversityAccess(entry.getCohort().getUniversity().getId(), currentUser);
         timetableRepository.delete(entry);
     }
 
@@ -159,11 +159,11 @@ public class TimetableService {
                 .lecturerName(e.getLecturer() != null
                         ? e.getLecturer().getFirstName() + " " + e.getLecturer().getLastName()
                         : null)
-                .universityId(e.getCohort().getProgramme().getUniversity() != null
-                        ? e.getCohort().getProgramme().getUniversity().getId()
+                .universityId(e.getCohort().getUniversity() != null
+                        ? e.getCohort().getUniversity().getId()
                         : null)
-                .universityName(e.getCohort().getProgramme().getUniversity() != null
-                        ? e.getCohort().getProgramme().getUniversity().getName()
+                .universityName(e.getCohort().getUniversity() != null
+                        ? e.getCohort().getUniversity().getName()
                         : null)
                 .build();
     }

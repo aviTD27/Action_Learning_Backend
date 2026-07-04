@@ -3,11 +3,14 @@ package fr.epita.service;
 import fr.epita.dto.Request.CreateProgrammeRequest;
 import fr.epita.dto.Response.ProgrammeResponse;
 import fr.epita.enums.ProgrammeStatus;
+import fr.epita.model.Cohort;
 import fr.epita.model.Programme;
 import fr.epita.model.University;
 import fr.epita.repository.CohortRepository;
 import fr.epita.repository.LecturerRepository;
 import fr.epita.repository.ProgrammeRepository;
+import fr.epita.repository.SemesterRepository;
+import fr.epita.repository.StudentRepository;
 import fr.epita.repository.UniversityRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
@@ -24,6 +27,8 @@ public class ProgrammeService {
     private final UniversityRepository universityRepository;
     private final CohortRepository cohortRepository;
     private final LecturerRepository lecturerRepository;
+    private final SemesterRepository semesterRepository;
+    private final StudentRepository studentRepository;
 
     public ProgrammeResponse create(CreateProgrammeRequest request) {
 
@@ -50,7 +55,7 @@ public class ProgrammeService {
                 ? programmeRepository.findByUniversityId(universityId)
                 : programmeRepository.findAll();
         return programmes.stream()
-                .filter(p -> p.getStatus() == fr.epita.enums.ProgrammeStatus.ACTIVE)  // Exclude archived programmes
+                .filter(p -> p.getStatus() == ProgrammeStatus.ACTIVE)
                 .map(this::toResponse)
                 .toList();
     }
@@ -60,7 +65,7 @@ public class ProgrammeService {
                 ? programmeRepository.findByUniversityId(universityId)
                 : programmeRepository.findAll();
         return programmes.stream()
-                .filter(p -> p.getStatus() == fr.epita.enums.ProgrammeStatus.ARCHIVED)  // Only archived
+                .filter(p -> p.getStatus() == ProgrammeStatus.ARCHIVED)
                 .map(this::toResponse)
                 .toList();
     }
@@ -82,31 +87,23 @@ public class ProgrammeService {
     public ProgrammeResponse getById(Long id) {
         Programme programme = programmeRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Programme not found"));
-
         return toResponse(programme);
     }
 
-    /** Archives a programme. Blocked if it has active cohorts or assigned lecturers. */
+    /** Archives a programme. Blocked if it still has enrolled students or assigned lecturers. */
     @Transactional
     public void archive(Long id) {
         Programme programme = programmeRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Programme not found"));
 
-        // Check for active cohorts (NOT_STARTED or ONGOING)
-        var activeCohorts = cohortRepository.findByProgramme_Id(id).stream()
-                .filter(c -> c.getStatus() == fr.epita.enums.CohortStatus.NOT_STARTED ||
-                            c.getStatus() == fr.epita.enums.CohortStatus.ONGOING)
-                .toList();
-
-        if (!activeCohorts.isEmpty()) {
-            throw new IllegalStateException("Cannot archive a programme with active cohorts. Complete or archive them first.");
+        if (!studentRepository.findByProgrammeId(id).isEmpty()) {
+            throw new IllegalStateException("Cannot archive a programme that has enrolled students. Move or remove them first.");
         }
-
         if (!lecturerRepository.findByProgrammes_Id(id).isEmpty()) {
             throw new IllegalStateException("Cannot archive a programme that has lecturers assigned. Unassign them first.");
         }
 
-        programme.setStatus(fr.epita.enums.ProgrammeStatus.ARCHIVED);
+        programme.setStatus(ProgrammeStatus.ARCHIVED);
         programmeRepository.save(programme);
     }
 
@@ -116,11 +113,10 @@ public class ProgrammeService {
         Programme programme = programmeRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Programme not found"));
 
-        if (programme.getStatus() != fr.epita.enums.ProgrammeStatus.ARCHIVED) {
+        if (programme.getStatus() != ProgrammeStatus.ARCHIVED) {
             throw new IllegalStateException("Programme is not archived.");
         }
-
-        programme.setStatus(fr.epita.enums.ProgrammeStatus.ACTIVE);
+        programme.setStatus(ProgrammeStatus.ACTIVE);
         programmeRepository.save(programme);
     }
 
@@ -135,6 +131,10 @@ public class ProgrammeService {
             response.setUniversityId(programme.getUniversity().getId());
             response.setUniversityName(programme.getUniversity().getName());
         }
+        List<Cohort> cohorts = cohortRepository.findByProgrammes_Id(programme.getId());
+        response.setCohortIds(cohorts.stream().map(Cohort::getId).toList());
+        response.setCohortNames(cohorts.stream().map(Cohort::getName).toList());
+        response.setSemesterCount(semesterRepository.findByProgrammeIdOrderByOrderIndexAsc(programme.getId()).size());
         return response;
     }
 }

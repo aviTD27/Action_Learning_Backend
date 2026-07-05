@@ -42,4 +42,6 @@ public class StudentGrade {
 
     @Column(nullable = false)
     private Instant gradedAt;
+
+    private Instant releasedAt;
 }

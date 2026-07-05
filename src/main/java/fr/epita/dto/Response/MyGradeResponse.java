@@ -18,4 +18,5 @@ public class MyGradeResponse {
     private double grade;
     private String feedback;
     private Instant gradedAt;
+    private Instant releasedAt;
 }

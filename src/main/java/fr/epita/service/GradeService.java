@@ -92,10 +92,12 @@ public class GradeService {
         List<StudentGrade> grades = studentGradeRepository.findBySubmissionId(submissionId);
 
         // Row 110 — only newly released grades trigger a "grade released" notification.
+        Instant now = Instant.now();
         List<StudentGrade> newlyReleased = new ArrayList<>();
         for (StudentGrade grade : grades) {
             if (grade.getStatus() != GradeStatus.RELEASED) {
                 grade.setStatus(GradeStatus.RELEASED);
+                grade.setReleasedAt(now);
                 newlyReleased.add(grade);
             }
         }
@@ -129,6 +131,7 @@ public class GradeService {
                 .grade(g.getGrade())
                 .feedback(g.getFeedback())
                 .gradedAt(g.getGradedAt())
+                .releasedAt(g.getReleasedAt())
                 .build();
     }
 

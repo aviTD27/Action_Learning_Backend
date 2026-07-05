@@ -148,15 +148,24 @@ public class SubmissionUploadService {
     public MyUploadStatusResponse getMyUploadStatus(Long submissionId, String studentEmail) {
         Student student = studentRepository.findByEmail(studentEmail)
                 .orElseThrow(() -> new EntityNotFoundException("Student not found"));
+        Submission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new EntityNotFoundException("Submission not found"));
         return uploadRepository
                 .findTopBySubmissionIdAndStudentIdOrderByUploadedAtDesc(submissionId, student.getId())
-                .map(u -> MyUploadStatusResponse.builder()
-                        .uploadId(u.getId())
-                        .turnedIn(Boolean.TRUE.equals(u.getTurnedIn()))
-                        .fileName(u.getOriginalFileName())
-                        .turnedInAt(u.getTurnedInAt() != null ? u.getTurnedInAt().toString() : null)
-                        .compliancePassed(u.isCompliancePassed())
-                        .build())
+                .map(u -> {
+                    boolean turnedIn = Boolean.TRUE.equals(u.getTurnedIn());
+                    boolean late = turnedIn && u.getTurnedInAt() != null
+                            && u.getTurnedInAt().atZone(ZoneOffset.UTC).toLocalDateTime()
+                                    .isAfter(submission.deadline());
+                    return MyUploadStatusResponse.builder()
+                            .uploadId(u.getId())
+                            .turnedIn(turnedIn)
+                            .fileName(u.getOriginalFileName())
+                            .turnedInAt(u.getTurnedInAt() != null ? u.getTurnedInAt().toString() : null)
+                            .compliancePassed(u.isCompliancePassed())
+                            .late(late)
+                            .build();
+                })
                 .orElse(null);
     }
 

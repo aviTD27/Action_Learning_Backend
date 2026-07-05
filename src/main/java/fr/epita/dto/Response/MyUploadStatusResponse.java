@@ -16,4 +16,5 @@ public class MyUploadStatusResponse {
     private String turnedInAt;
     private boolean compliancePassed;
     private boolean late;
+    private boolean reopened;
 }

@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +46,16 @@ public class SubmissionUploadService {
     @Transactional
     public ComplianceReportResponse processUpload(
             Submission submission, Student student, MultipartFile file) throws IOException {
+
+        // Enforce deadline (row 99) — reject uploads past deadline unless lecturer reopened.
+        if (LocalDateTime.now().isAfter(submission.deadline())) {
+            boolean reopened = submission.getReopenedStudentIds() != null
+                    && submission.getReopenedStudentIds().contains(student.getId());
+            if (!reopened) {
+                throw new IllegalStateException(
+                        "The deadline has passed. Submissions are no longer accepted.");
+            }
+        }
 
         String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "unknown";
 
@@ -89,12 +100,23 @@ public class SubmissionUploadService {
     public void turnIn(Long uploadId, String studentEmail) {
         SubmissionUpload upload = uploadRepository.findById(uploadId)
                 .orElseThrow(() -> new EntityNotFoundException("Upload not found"));
-        if (!upload.getStudent().getEmail().equals(studentEmail))
+        Student student = upload.getStudent();
+        if (!student.getEmail().equals(studentEmail))
             throw new SecurityException("Not your upload");
         if (!upload.isCompliancePassed())
             throw new IllegalStateException("Cannot turn in a document that failed compliance checks.");
         if (Boolean.TRUE.equals(upload.getTurnedIn()))
             throw new IllegalStateException("Document already turned in.");
+        // Enforce deadline (row 99).
+        Submission submission = upload.getSubmission();
+        if (LocalDateTime.now().isAfter(submission.deadline())) {
+            boolean reopened = submission.getReopenedStudentIds() != null
+                    && submission.getReopenedStudentIds().contains(student.getId());
+            if (!reopened) {
+                throw new IllegalStateException(
+                        "The deadline has passed. You cannot turn in this submission.");
+            }
+        }
         upload.setTurnedIn(true);
         upload.setTurnedInAt(Instant.now());
         uploadRepository.save(upload);
@@ -150,6 +172,8 @@ public class SubmissionUploadService {
                 .orElseThrow(() -> new EntityNotFoundException("Student not found"));
         Submission submission = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> new EntityNotFoundException("Submission not found"));
+        boolean reopened = submission.getReopenedStudentIds() != null
+                && submission.getReopenedStudentIds().contains(student.getId());
         return uploadRepository
                 .findTopBySubmissionIdAndStudentIdOrderByUploadedAtDesc(submissionId, student.getId())
                 .map(u -> {
@@ -164,9 +188,14 @@ public class SubmissionUploadService {
                             .turnedInAt(u.getTurnedInAt() != null ? u.getTurnedInAt().toString() : null)
                             .compliancePassed(u.isCompliancePassed())
                             .late(late)
+                            .reopened(reopened)
                             .build();
                 })
-                .orElse(null);
+                .orElseGet(() -> MyUploadStatusResponse.builder()
+                        .turnedIn(false)
+                        .late(false)
+                        .reopened(reopened)
+                        .build());
     }
 
     /** Stores a template/brief file for an assignment and records it on the submission (row 68). */

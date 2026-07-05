@@ -1,5 +1,6 @@
 package fr.epita.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.epita.dto.Response.ComplianceReportResponse;
 import fr.epita.dto.Response.MyUploadStatusResponse;
 import fr.epita.dto.Response.StudentSubmissionResponse;
@@ -39,6 +40,7 @@ public class SubmissionUploadService {
     private final SubmissionUploadRepository uploadRepository;
     private final SubmissionRepository submissionRepository;
     private final StudentRepository studentRepository;
+    private final ObjectMapper objectMapper;
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -93,6 +95,15 @@ public class SubmissionUploadService {
 
         SubmissionUpload saved = uploadRepository.save(upload);
         report.setUploadId(saved.getId());
+
+        // Persist the structured report so students can see failure reasons after page refresh.
+        try {
+            saved.setComplianceReportJson(objectMapper.writeValueAsString(report));
+            uploadRepository.save(saved);
+        } catch (Exception ignored) {
+            // Non-critical: report is still returned in the response right now.
+        }
+
         return report;
     }
 
@@ -183,6 +194,13 @@ public class SubmissionUploadService {
                     boolean late = turnedIn && u.getTurnedInAt() != null
                             && u.getTurnedInAt().atZone(ZoneOffset.UTC).toLocalDateTime()
                                     .isAfter(submission.deadline());
+                    ComplianceReportResponse complianceReport = null;
+                    if (!turnedIn && u.getComplianceReportJson() != null && !u.getComplianceReportJson().isBlank()) {
+                        try {
+                            complianceReport = objectMapper.readValue(
+                                    u.getComplianceReportJson(), ComplianceReportResponse.class);
+                        } catch (Exception ignored) {}
+                    }
                     return MyUploadStatusResponse.builder()
                             .uploadId(u.getId())
                             .turnedIn(turnedIn)
@@ -191,6 +209,7 @@ public class SubmissionUploadService {
                             .compliancePassed(u.isCompliancePassed())
                             .late(late)
                             .reopened(reopened)
+                            .complianceReport(complianceReport)
                             .build();
                 })
                 .orElseGet(() -> MyUploadStatusResponse.builder()

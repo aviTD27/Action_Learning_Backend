@@ -19,4 +19,5 @@ public class MyGradeResponse {
     private String feedback;
     private Instant gradedAt;
     private Instant releasedAt;
+    private boolean revised;
 }

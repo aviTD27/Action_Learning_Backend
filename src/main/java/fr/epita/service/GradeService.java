@@ -124,6 +124,8 @@ public class GradeService {
     }
 
     private MyGradeResponse toMyGradeResponse(StudentGrade g) {
+        boolean revised = g.getReleasedAt() != null
+                && g.getGradedAt().isAfter(g.getReleasedAt());
         return MyGradeResponse.builder()
                 .submissionId(g.getSubmission().getId())
                 .submissionTitle(g.getSubmission().getTitle())
@@ -132,6 +134,7 @@ public class GradeService {
                 .feedback(g.getFeedback())
                 .gradedAt(g.getGradedAt())
                 .releasedAt(g.getReleasedAt())
+                .revised(revised)
                 .build();
     }
 

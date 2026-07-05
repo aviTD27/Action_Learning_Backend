@@ -127,6 +127,7 @@ public class SubmissionUploadService {
      * status (SUBMITTED/LATE), the uploadId for download, and the re-open flag.
      * Students who have not submitted are derived on the client from the cohort roster.
      */
+    @Transactional
     public List<StudentSubmissionResponse> getStudentSubmissions(Submission submission) {
         var reopened = submission.getReopenedStudentIds() != null
                 ? submission.getReopenedStudentIds() : java.util.Set.<Long>of();
@@ -167,6 +168,7 @@ public class SubmissionUploadService {
         return uploadRepository.findBySubmissionIdAndTurnedInTrue(submissionId);
     }
 
+    @Transactional
     public MyUploadStatusResponse getMyUploadStatus(Long submissionId, String studentEmail) {
         Student student = studentRepository.findByEmail(studentEmail)
                 .orElseThrow(() -> new EntityNotFoundException("Student not found"));

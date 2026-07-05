@@ -270,8 +270,8 @@ public class StudentService {
         Cohort cohort = student.getCohort();
         if (cohort == null) throw new IllegalStateException("Student is not assigned to a cohort");
 
-        // A student's programme now lives on the student (enrolment), not on the cohort.
         Programme programme = student.getProgramme();
+        if (programme == null) throw new IllegalStateException("Student is not enrolled in a programme");
 
         List<String> lecturerNames = lecturerRepository.findByProgrammes_Id(programme.getId())
                 .stream()

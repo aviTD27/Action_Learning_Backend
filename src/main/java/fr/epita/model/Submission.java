@@ -74,7 +74,7 @@ public class Submission {
 
     /** Student ids explicitly re-opened for a late exception. */
     @Builder.Default
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "submission_reopened_students",
             joinColumns = @JoinColumn(name = "submission_id"))
     @Column(name = "student_id")

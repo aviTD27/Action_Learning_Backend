@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -20,6 +21,9 @@ public class TimetableResponse {
 
     private Long cohortId;
     private String cohortName;
+
+    /** Names of programmes running in this cohort — a slot can serve multiple programmes. */
+    private List<String> programmeNames;
 
     private Long lecturerId;
     private String lecturerName;

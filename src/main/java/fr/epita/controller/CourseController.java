@@ -2,7 +2,9 @@ package fr.epita.controller;
 
 import fr.epita.dto.Request.CreateCourseRequest;
 import fr.epita.dto.Response.CourseResponse;
+import fr.epita.enums.Role;
 import fr.epita.model.AppUser;
+import fr.epita.repository.LecturerRepository;
 import fr.epita.service.CourseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import java.util.List;
 public class CourseController {
 
     private final CourseService courseService;
+    private final LecturerRepository lecturerRepository;
 
     @GetMapping
     public ResponseEntity<List<CourseResponse>> getAll(
@@ -28,6 +31,11 @@ public class CourseController {
             @AuthenticationPrincipal AppUser currentUser) {
         Long uni = universityId != null ? universityId
                 : (currentUser != null ? currentUser.getUniversityId() : null);
+        if (currentUser != null && currentUser.getRole() == Role.ROLE_LECTURER) {
+            lecturerId = lecturerRepository.findByEmail(currentUser.getEmail())
+                    .map(l -> l.getId())
+                    .orElse(null);
+        }
         return ResponseEntity.ok(courseService.getAll(semesterId, programmeId, lecturerId, uni));
     }
 

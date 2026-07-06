@@ -8,11 +8,6 @@ import lombok.*;
 
 import java.util.List;
 
-/**
- * A Cohort is now an INTAKE SEASON (e.g. "Spring 2026") that is university-wide.
- * Programmes are attached to a cohort via a many-to-many relationship, and students
- * belong to a cohort intake. (Previously a cohort belonged to a single programme.)
- */
 @Entity
 @Getter
 @Setter

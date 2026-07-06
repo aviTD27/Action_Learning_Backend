@@ -18,7 +18,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
+import java.time.DayOfWeek;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -56,6 +61,28 @@ public class TimetableService {
         }
 
         return entries.stream().map(this::toResponse).toList();
+    }
+
+    /**
+     * Returns all timetable entries grouped by day of week, sorted by startTime within each day.
+     * Days with no entries are omitted. Multiple entries at the same time are preserved as a list.
+     */
+    public Map<String, List<TimetableResponse>> getWeekly(AppUser currentUser) {
+        List<TimetableResponse> all = getAll(currentUser);
+
+        // Maintain calendar order: Mon → Sun
+        Map<String, List<TimetableResponse>> grouped = new LinkedHashMap<>();
+        Arrays.stream(DayOfWeek.values()).forEach(day ->
+                grouped.put(day.name(), new java.util.ArrayList<>()));
+
+        all.forEach(entry -> grouped.get(entry.getDayOfWeek().name()).add(entry));
+
+        // Sort each day's list by startTime, then remove empty days
+        grouped.values().forEach(list ->
+                list.sort(java.util.Comparator.comparing(TimetableResponse::getStartTime)));
+        grouped.entrySet().removeIf(e -> e.getValue().isEmpty());
+
+        return grouped;
     }
 
     @Transactional
@@ -145,6 +172,12 @@ public class TimetableService {
     }
 
     private TimetableResponse toResponse(TimetableEntry e) {
+        List<String> programmeNames = e.getCohort().getProgrammes() != null
+                ? e.getCohort().getProgrammes().stream()
+                        .map(p -> p.getName())
+                        .collect(Collectors.toList())
+                : List.of();
+
         return TimetableResponse.builder()
                 .id(e.getId())
                 .title(e.getTitle())
@@ -155,6 +188,7 @@ public class TimetableService {
                 .color(e.getColor())
                 .cohortId(e.getCohort().getId())
                 .cohortName(e.getCohort().getName())
+                .programmeNames(programmeNames)
                 .lecturerId(e.getLecturer() != null ? e.getLecturer().getId() : null)
                 .lecturerName(e.getLecturer() != null
                         ? e.getLecturer().getFirstName() + " " + e.getLecturer().getLastName()

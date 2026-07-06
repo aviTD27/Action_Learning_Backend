@@ -1,6 +1,7 @@
 package fr.epita.service;
 
 import fr.epita.dto.Response.ComplianceReportResponse;
+import fr.epita.dto.Response.ScoringReportResponse;
 import fr.epita.model.SubmissionRules;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -54,5 +55,21 @@ public class AiServiceClient {
                 .body(body)
                 .retrieve()
                 .body(ComplianceReportResponse.class);
+    }
+
+    public ScoringReportResponse score(MultipartFile file) throws IOException {
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        byte[] bytes = file.getBytes();
+        String filename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "document";
+        body.add("file", new ByteArrayResource(bytes) {
+            @Override
+            public String getFilename() { return filename; }
+        });
+        return restClient.post()
+                .uri("/score")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(body)
+                .retrieve()
+                .body(ScoringReportResponse.class);
     }
 }

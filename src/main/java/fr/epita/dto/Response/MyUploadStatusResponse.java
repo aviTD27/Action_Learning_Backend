@@ -19,4 +19,6 @@ public class MyUploadStatusResponse {
     private boolean reopened;
     /** Full structured compliance report — null when not yet uploaded or JSON unreadable. */
     private ComplianceReportResponse complianceReport;
+    /** Per-criterion NLP scoring — null when not yet scored or turned in. */
+    private ScoringReportResponse scoringReport;
 }

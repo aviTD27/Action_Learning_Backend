@@ -42,6 +42,9 @@ public class SubmissionUpload {
     @Column(length = 5000)
     private String complianceReportJson;
 
+    @Column(length = 5000)
+    private String scoringReportJson;
+
     @Column(nullable = false)
     private Instant uploadedAt;
 

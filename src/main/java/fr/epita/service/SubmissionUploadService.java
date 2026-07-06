@@ -3,6 +3,7 @@ package fr.epita.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.epita.dto.Response.ComplianceReportResponse;
 import fr.epita.dto.Response.MyUploadStatusResponse;
+import fr.epita.dto.Response.ScoringReportResponse;
 import fr.epita.dto.Response.StudentSubmissionResponse;
 import fr.epita.model.Student;
 import fr.epita.model.Submission;
@@ -13,6 +14,7 @@ import fr.epita.repository.SubmissionUploadRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,6 +34,7 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SubmissionUploadService {
@@ -104,6 +107,17 @@ public class SubmissionUploadService {
             // Non-critical: report is still returned in the response right now.
         }
 
+        // Run NLP scoring only for compliant documents; store per-criterion feedback.
+        if (report.isOverallPass()) {
+            try {
+                ScoringReportResponse scoring = aiServiceClient.score(file);
+                saved.setScoringReportJson(objectMapper.writeValueAsString(scoring));
+                uploadRepository.save(saved);
+            } catch (Exception e) {
+                log.warn("NLP scoring failed for upload {}: {}", saved.getId(), e.getMessage());
+            }
+        }
+
         return report;
     }
 
@@ -168,6 +182,18 @@ public class SubmissionUploadService {
                 .collect(Collectors.toList());
     }
 
+    public ScoringReportResponse getScore(Long uploadId) {
+        SubmissionUpload upload = uploadRepository.findById(uploadId)
+                .orElseThrow(() -> new EntityNotFoundException("Upload not found"));
+        if (upload.getScoringReportJson() == null || upload.getScoringReportJson().isBlank())
+            throw new EntityNotFoundException("No scoring data available for this upload");
+        try {
+            return objectMapper.readValue(upload.getScoringReportJson(), ScoringReportResponse.class);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to deserialise scoring report", e);
+        }
+    }
+
     /** Loads a single upload (for a lecturer download); row 75. */
     public SubmissionUpload getUploadForDownload(Long uploadId) {
         return uploadRepository.findById(uploadId)
@@ -195,11 +221,20 @@ public class SubmissionUploadService {
                             && u.getTurnedInAt().atZone(ZoneOffset.UTC).toLocalDateTime()
                                     .isAfter(submission.deadline());
                     ComplianceReportResponse complianceReport = null;
-                    if (!turnedIn && u.getComplianceReportJson() != null && !u.getComplianceReportJson().isBlank()) {
-                        try {
-                            complianceReport = objectMapper.readValue(
-                                    u.getComplianceReportJson(), ComplianceReportResponse.class);
-                        } catch (Exception ignored) {}
+                    ScoringReportResponse scoringReport = null;
+                    if (!turnedIn) {
+                        if (u.getComplianceReportJson() != null && !u.getComplianceReportJson().isBlank()) {
+                            try {
+                                complianceReport = objectMapper.readValue(
+                                        u.getComplianceReportJson(), ComplianceReportResponse.class);
+                            } catch (Exception ignored) {}
+                        }
+                        if (u.getScoringReportJson() != null && !u.getScoringReportJson().isBlank()) {
+                            try {
+                                scoringReport = objectMapper.readValue(
+                                        u.getScoringReportJson(), ScoringReportResponse.class);
+                            } catch (Exception ignored) {}
+                        }
                     }
                     return MyUploadStatusResponse.builder()
                             .uploadId(u.getId())
@@ -210,6 +245,7 @@ public class SubmissionUploadService {
                             .late(late)
                             .reopened(reopened)
                             .complianceReport(complianceReport)
+                            .scoringReport(scoringReport)
                             .build();
                 })
                 .orElseGet(() -> MyUploadStatusResponse.builder()

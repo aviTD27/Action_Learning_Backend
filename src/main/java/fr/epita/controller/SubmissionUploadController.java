@@ -2,6 +2,7 @@ package fr.epita.controller;
 
 import fr.epita.dto.Response.ComplianceReportResponse;
 import fr.epita.dto.Response.MyUploadStatusResponse;
+import fr.epita.dto.Response.ScoringReportResponse;
 import fr.epita.dto.Response.StudentSubmissionResponse;
 import fr.epita.enums.Role;
 import fr.epita.model.AppUser;
@@ -118,6 +119,17 @@ public class SubmissionUploadController {
         }
         byte[] data = uploadService.readBytes(upload.getStoredPath());
         return fileResponse(data, upload.getOriginalFileName());
+    }
+
+    /** Returns the NLP scoring breakdown for an upload — lecturer and uni-admin only. */
+    @GetMapping("/uploads/{uploadId}/score")
+    public ResponseEntity<ScoringReportResponse> getScore(
+            @PathVariable Long uploadId,
+            @AuthenticationPrincipal AppUser currentUser) {
+        if (currentUser == null || currentUser.getRole() == Role.ROLE_STUDENT) {
+            return ResponseEntity.status(403).build();
+        }
+        return ResponseEntity.ok(uploadService.getScore(uploadId));
     }
 
     /** Row 76 — lecturer downloads every submission for an assignment as one ZIP. */

@@ -2,6 +2,7 @@ package fr.epita.controller;
 
 import fr.epita.dto.Request.SendAnnouncementRequest;
 import fr.epita.dto.Response.AnnouncementResponse;
+import fr.epita.dto.Response.SentAnnouncementResponse;
 import fr.epita.enums.Role;
 import fr.epita.model.AppUser;
 import fr.epita.service.AnnouncementService;
@@ -30,6 +31,14 @@ public class AnnouncementController {
             @AuthenticationPrincipal AppUser currentUser) {
         announcementService.send(request, currentUser);
         return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    // ── SENT OUTBOX (UNI_ADMIN + Lecturer) ──────────────────────────────
+
+    @GetMapping("/sent")
+    public ResponseEntity<List<SentAnnouncementResponse>> getSent(
+            @AuthenticationPrincipal AppUser currentUser) {
+        return ResponseEntity.ok(announcementService.getSent(currentUser));
     }
 
     // ── STUDENT INBOX ────────────────────────────────────────────────────

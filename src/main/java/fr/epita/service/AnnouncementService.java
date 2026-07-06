@@ -2,6 +2,7 @@ package fr.epita.service;
 
 import fr.epita.dto.Request.SendAnnouncementRequest;
 import fr.epita.dto.Response.AnnouncementResponse;
+import fr.epita.dto.Response.SentAnnouncementResponse;
 import fr.epita.enums.AnnouncementAudience;
 import fr.epita.enums.Role;
 import fr.epita.model.*;
@@ -51,6 +52,8 @@ public class AnnouncementService {
                         .senderName(senderName)
                         .senderRole(role)
                         .universityId(universityId)
+                        .senderEmail(sender.getEmail())
+                        .cohortId(request.getCohortId())
                         .audience(audience)
                         .build()
         );
@@ -163,6 +166,37 @@ public class AnnouncementService {
                 lecturerRecipientRepository.findByLecturerIdAndReadFlagFalse(lecturer.getId());
         unread.forEach(r -> r.setReadFlag(true));
         lecturerRecipientRepository.saveAll(unread);
+    }
+
+    /** Sent-outbox for the current user (UNI_ADMIN or Lecturer) */
+    public List<SentAnnouncementResponse> getSent(AppUser currentUser) {
+        return announcementRepository
+                .findBySenderEmailOrderBySentAtDesc(currentUser.getEmail())
+                .stream()
+                .map(this::toSentResponse)
+                .toList();
+    }
+
+    private SentAnnouncementResponse toSentResponse(Announcement a) {
+        long studentCount  = studentRecipientRepository.countByAnnouncementId(a.getId());
+        long lecturerCount = lecturerRecipientRepository.countByAnnouncementId(a.getId());
+
+        String cohortName = null;
+        if (a.getAudience() == AnnouncementAudience.ALL_COHORT_STUDENTS && a.getCohortId() != null) {
+            cohortName = cohortRepository.findById(a.getCohortId())
+                    .map(c -> c.getName())
+                    .orElse(null);
+        }
+
+        return SentAnnouncementResponse.builder()
+                .id(a.getId())
+                .subject(a.getSubject())
+                .message(a.getMessage())
+                .audience(a.getAudience().name())
+                .cohortName(cohortName)
+                .recipientCount((int) (studentCount + lecturerCount))
+                .sentAt(a.getSentAt())
+                .build();
     }
 
     private void createStudentRecipient(Announcement announcement, Student student) {

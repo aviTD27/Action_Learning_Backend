@@ -39,6 +39,14 @@ public class Announcement {
     @Column(nullable = false)
     private Long universityId;
 
+    /** Email of the sender — used to retrieve sent announcements per user */
+    @Column
+    private String senderEmail;
+
+    /** Stored for ALL_COHORT_STUDENTS announcements so sent-view can show cohort name */
+    @Column
+    private Long cohortId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AnnouncementAudience audience;

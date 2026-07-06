@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface AnnouncementRepository extends JpaRepository<Announcement, Long> {
     List<Announcement> findByUniversityIdOrderBySentAtDesc(Long universityId);
+    List<Announcement> findBySenderEmailOrderBySentAtDesc(String senderEmail);
 }

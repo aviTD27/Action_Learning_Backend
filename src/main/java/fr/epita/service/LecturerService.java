@@ -44,9 +44,7 @@ public class LecturerService {
 
     @Transactional
     public LecturerResponse create(CreateLecturerRequest request, Long universityId) {
-        if (lecturerRepository.existsByLecturerRef(request.getLecturerRef())) {
-            throw new IllegalStateException("Lecturer reference already exists");
-        }
+        String lecturerRef = generateLecturerRef();
         // The form email (if provided) is the PERSONAL email — only the recipient of the credentials.
         String personalEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null;
         List<Programme> programmes = resolveProgrammes(request.getProgrammeIds());
@@ -73,7 +71,7 @@ public class LecturerService {
                 .lastName(request.getLastName())
                 .email(professionalEmail)
                 .phone(request.getPhone())
-                .lecturerRef(request.getLecturerRef())
+                .lecturerRef(lecturerRef)
                 .password(hashed)
                 .programmes(programmes)
                 .status(LecturerStatus.ACTIVE)
@@ -84,6 +82,16 @@ public class LecturerService {
         emailService.sendAccountCreatedEmail(recipient, request.getFirstName(), professionalEmail, tempPassword, "Lecturer");
 
         return response;
+    }
+
+    private String generateLecturerRef() {
+        String ref;
+        do {
+            StringBuilder sb = new StringBuilder("LEC-");
+            for (int i = 0; i < 8; i++) sb.append(RANDOM.nextInt(10));
+            ref = sb.toString();
+        } while (lecturerRepository.existsByLecturerRef(ref));
+        return ref;
     }
 
     private String generateTempPassword() {

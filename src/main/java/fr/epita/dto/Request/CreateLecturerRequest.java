@@ -15,11 +15,9 @@ public class CreateLecturerRequest {
     @NotBlank
     private String lastName;
     
-    @Email
     private String email;
 
-    @NotBlank
-    private String lecturerRef;
+    // lecturerRef is auto-generated server-side (LEC-XXXXXXXX); do not send from frontend.
 
     @NotEmpty
     private List<Long> programmeIds;

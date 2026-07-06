@@ -65,8 +65,7 @@ public class StudentService {
     @Transactional
     public StudentResponse create(CreateStudentRequest request, Long universityId) {
 
-        if (studentRepository.existsByStudentRef(request.getStudentRef()))
-            throw new IllegalStateException("Student reference already exists");
+        String studentRef = generateStudentRef();
 
         Cohort cohort = cohortRepository.findById(request.getCohortId())
                 .orElseThrow(() -> new EntityNotFoundException("Cohort not found"));
@@ -96,7 +95,7 @@ public class StudentService {
                 .lastName(request.getLastName())
                 .email(platformEmail)
                 .password(hashed)
-                .studentRef(request.getStudentRef())
+                .studentRef(studentRef)
                 .programme(programme)
                 .status(request.getStatus())
                 .cohort(cohort)
@@ -185,6 +184,16 @@ public class StudentService {
         return email;
     }
 
+    private String generateStudentRef() {
+        String ref;
+        do {
+            StringBuilder sb = new StringBuilder("STU-");
+            for (int i = 0; i < 8; i++) sb.append(RANDOM.nextInt(10));
+            ref = sb.toString();
+        } while (studentRepository.existsByStudentRef(ref));
+        return ref;
+    }
+
     private String generateTempPassword() {
         StringBuilder sb = new StringBuilder(12);
         for (int i = 0; i < 12; i++) {
@@ -209,7 +218,6 @@ public class StudentService {
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             student.setPassword(request.getPassword());
         }
-        student.setStudentRef(request.getStudentRef());
         student.setStatus(request.getStatus());
 
         Programme programme = programmeRepository.findById(request.getProgrammeId())

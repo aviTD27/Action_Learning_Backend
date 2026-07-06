@@ -8,4 +8,5 @@ import java.util.List;
 public interface AnnouncementLecturerRecipientRepository extends JpaRepository<AnnouncementLecturerRecipient, Long> {
     List<AnnouncementLecturerRecipient> findByLecturerIdOrderByAnnouncement_SentAtDesc(Long lecturerId);
     List<AnnouncementLecturerRecipient> findByLecturerIdAndReadFlagFalse(Long lecturerId);
+    long countByAnnouncementId(Long announcementId);
 }

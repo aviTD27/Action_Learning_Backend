@@ -4,9 +4,6 @@ import com.sendgrid.Method;
 import com.sendgrid.Request;
 import com.sendgrid.Response;
 import com.sendgrid.SendGrid;
-import com.sendgrid.helpers.mail.Email;
-import com.sendgrid.helpers.mail.Mail;
-import com.sendgrid.helpers.mail.Content;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
@@ -75,17 +72,34 @@ public class EmailService {
 
     private void send(String to, String subject, String htmlBody) {
         try {
-            Mail mail = new Mail(
-                    new Email(fromAddress),
-                    subject,
-                    new Email(to),
-                    new Content("text/html", htmlBody)
+            // Construct SendGrid API request body (no Mail/Email/Content classes needed)
+            String requestBody = String.format("""
+                    {
+                      "personalizations": [
+                        {
+                          "to": [{"email": "%s"}],
+                          "subject": "%s"
+                        }
+                      ],
+                      "from": {"email": "%s"},
+                      "content": [
+                        {
+                          "type": "text/html",
+                          "value": "%s"
+                        }
+                      ]
+                    }
+                    """,
+                    escapeJson(to),
+                    escapeJson(subject),
+                    escapeJson(fromAddress),
+                    escapeJson(htmlBody)
             );
 
             Request request = new Request();
             request.setMethod(Method.POST);
             request.setEndpoint("mail/send");
-            request.setBody(mail.build());
+            request.setBody(requestBody);
 
             Response response = sendGrid.api(request);
 
@@ -98,6 +112,15 @@ public class EmailService {
             // Log the error — do NOT rethrow. Email failure must not roll back the DB transaction.
             log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
         }
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) return "";
+        return value.replace("\\", "\\\\")
+                   .replace("\"", "\\\"")
+                   .replace("\n", "\\n")
+                   .replace("\r", "\\r")
+                   .replace("\t", "\\t");
     }
 
     // ---- One named builder per email type; all compose from the shared blocks below. ----

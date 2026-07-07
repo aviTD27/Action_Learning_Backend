@@ -121,7 +121,7 @@
         <dependency>
             <groupId>com.sendgrid</groupId>
             <artifactId>sendgrid-java</artifactId>
-            <version>4.12.0</version>
+            <version>4.10.2</version>
         </dependency>
 
         <!-- JWT (jjwt 0.12.x) -->

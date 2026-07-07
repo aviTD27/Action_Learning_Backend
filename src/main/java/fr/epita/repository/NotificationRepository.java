@@ -10,4 +10,5 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findByStudentIdOrderByCreatedAtDesc(Long studentId);
     List<Notification> findByStudentIdAndReadFlagFalse(Long studentId);
     boolean existsBySubmissionIdAndType(Long submissionId, NotificationType type);
+    void deleteBySubmissionId(Long submissionId);
 }

@@ -13,6 +13,7 @@ import fr.epita.model.Submission;
 import fr.epita.model.SubmissionRules;
 import fr.epita.repository.CourseRepository;
 import fr.epita.repository.LecturerRepository;
+import fr.epita.repository.NotificationRepository;
 import fr.epita.repository.StudentGradeRepository;
 import fr.epita.repository.SubmissionRepository;
 import fr.epita.repository.SubmissionUploadRepository;
@@ -48,6 +49,7 @@ public class SubmissionService {
     private final SubmissionUploadRepository uploadRepository;
     private final CourseRepository courseRepository;
     private final LecturerRepository lecturerRepository;
+    private final NotificationRepository notificationRepository;
     private final NotificationService notificationService;
 
     @Value("${app.upload.dir:uploads}")
@@ -218,6 +220,8 @@ public class SubmissionService {
             throw new IllegalStateException(
                     "This assignment has student submissions and can only be archived, not deleted.");
         }
+        // Delete related data before deleting the submission
+        notificationRepository.deleteBySubmissionId(submission.getId());
         studentGradeRepository.deleteBySubmissionId(submission.getId());
         submissionRepository.delete(submission);
     }
@@ -269,6 +273,16 @@ public class SubmissionService {
     private Submission find(Long id) {
         return submissionRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Submission not found"));
+    }
+
+    /**
+     * Get the Lecturer ID for a given email address.
+     * Used to ensure lecturers can only see their own submissions.
+     */
+    public Long getLecturerIdByEmail(String email) {
+        return lecturerRepository.findByEmail(email)
+                .map(Lecturer::getId)
+                .orElse(null);
     }
 
     private Lecturer resolveLecturer(Long lecturerId) {

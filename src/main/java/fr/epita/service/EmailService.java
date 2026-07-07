@@ -1,26 +1,31 @@
 package fr.epita.service;
 
-import lombok.RequiredArgsConstructor;
+import com.sendgrid.Method;
+import com.sendgrid.Request;
+import com.sendgrid.Response;
+import com.sendgrid.SendGrid;
+import com.sendgrid.helpers.mail.Email;
+import com.sendgrid.helpers.mail.Mail;
+import com.sendgrid.helpers.mail.Content;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.MailException;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
+import java.io.IOException;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    private final SendGrid sendGrid;
+    private final String fromAddress;
 
-    @Value("${app.mail.from}")
-    private String fromAddress;
+    public EmailService(@Value("${sendgrid.api.key}") String apiKey,
+                        @Value("${app.mail.from}") String fromAddress) {
+        this.sendGrid = new SendGrid(apiKey);
+        this.fromAddress = fromAddress;
+    }
 
     /**
      * @param toEmail       adminContactEmail — where the email lands
@@ -32,16 +37,16 @@ public class EmailService {
     public void sendApprovalEmail(String toEmail, String firstName, String platformEmail, String tempPassword) {
         log.info("Sending approval email to {} (platform login: {})", toEmail, platformEmail);
         send(toEmail,
-             "Your Action Learning Platform Access Has Been Approved",
-             buildApprovalBody(firstName, platformEmail, tempPassword));
+                "Your Action Learning Platform Access Has Been Approved",
+                buildApprovalBody(firstName, platformEmail, tempPassword));
     }
 
     @Async
     public void sendPlatformAdminWelcomeEmail(String toEmail, String firstName, String tempPassword) {
         log.info("Sending platform admin welcome email to {}", toEmail);
         send(toEmail,
-             "Your Action Learning Platform Admin Account",
-             buildPlatformAdminBody(firstName, toEmail, tempPassword));
+                "Your Action Learning Platform Admin Account",
+                buildPlatformAdminBody(firstName, toEmail, tempPassword));
     }
 
     @Async
@@ -49,16 +54,16 @@ public class EmailService {
                                         String tempPassword, String roleLabel) {
         log.info("Sending {} welcome email to {} (login: {})", roleLabel, toEmail, loginEmail);
         send(toEmail,
-             "Your Action Learning Platform Account Is Ready",
-             buildAccountCreatedBody(firstName, loginEmail, tempPassword, roleLabel));
+                "Your Action Learning Platform Account Is Ready",
+                buildAccountCreatedBody(firstName, loginEmail, tempPassword, roleLabel));
     }
 
     @Async
     public void sendRejectionEmail(String toEmail, String firstName, String reason) {
         log.info("Sending rejection email to {}", toEmail);
         send(toEmail,
-             "Update on Your Action Learning Platform Request",
-             buildRejectionBody(firstName, reason));
+                "Update on Your Action Learning Platform Request",
+                buildRejectionBody(firstName, reason));
     }
 
     /** Sent to a student when a lecturer notifies the cohort  */
@@ -70,15 +75,26 @@ public class EmailService {
 
     private void send(String to, String subject, String htmlBody) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(fromAddress);
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(htmlBody, true);
-            mailSender.send(message);
-            log.info("Email successfully sent to {}", to);
-        } catch (MessagingException | MailException e) {
+            Mail mail = new Mail(
+                    new Email(fromAddress),
+                    subject,
+                    new Email(to),
+                    new Content("text/html", htmlBody)
+            );
+
+            Request request = new Request();
+            request.setMethod(Method.POST);
+            request.setEndpoint("mail/send");
+            request.setBody(mail.build());
+
+            Response response = sendGrid.api(request);
+
+            if (response.getStatusCode() == 202) {
+                log.info("Email successfully sent to {}", to);
+            } else {
+                log.error("Failed to send email to {}: HTTP {}", to, response.getStatusCode());
+            }
+        } catch (IOException e) {
             // Log the error — do NOT rethrow. Email failure must not roll back the DB transaction.
             log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
         }
@@ -89,28 +105,28 @@ public class EmailService {
     private String buildApprovalBody(String firstName, String platformEmail, String tempPassword) {
         return layout("Welcome to the Action Learning Platform",
                 greeting(firstName)
-              + "<p>Your university registration request has been "
-              + "<strong style=\"color:#27ae60;\">approved</strong>. Your administrator account "
-              + "has been created and is ready to use.</p>"
-              + credentialsBlock(platformEmail, tempPassword)
-              + "<p>As a university administrator you can now manage your institution's "
-              + "programmes, cohorts, lecturers, and students.</p>");
+                        + "<p>Your university registration request has been "
+                        + "<strong style=\"color:#27ae60;\">approved</strong>. Your administrator account "
+                        + "has been created and is ready to use.</p>"
+                        + credentialsBlock(platformEmail, tempPassword)
+                        + "<p>As a university administrator you can now manage your institution's "
+                        + "programmes, cohorts, lecturers, and students.</p>");
     }
 
     private String buildAccountCreatedBody(String firstName, String loginEmail, String tempPassword, String roleLabel) {
         return layout("Welcome to the Action Learning Platform",
                 greeting(firstName)
-              + "<p>A <strong>" + roleLabel + "</strong> account has been created for you on the "
-              + "Action Learning Platform and is ready to use.</p>"
-              + credentialsBlock(loginEmail, tempPassword));
+                        + "<p>A <strong>" + roleLabel + "</strong> account has been created for you on the "
+                        + "Action Learning Platform and is ready to use.</p>"
+                        + credentialsBlock(loginEmail, tempPassword));
     }
 
     private String buildPlatformAdminBody(String firstName, String loginEmail, String tempPassword) {
         return layout("Welcome — Platform Administrator Account Created",
                 greeting(firstName)
-              + "<p>A platform administrator account has been created for you on the "
-              + "Action Learning Platform.</p>"
-              + credentialsBlock(loginEmail, tempPassword));
+                        + "<p>A platform administrator account has been created for you on the "
+                        + "Action Learning Platform.</p>"
+                        + credentialsBlock(loginEmail, tempPassword));
     }
 
     private String buildRejectionBody(String firstName, String reason) {
@@ -119,18 +135,18 @@ public class EmailService {
                 : "";
         return layout("Update on Your Registration Request",
                 greeting(firstName)
-              + "<p>After reviewing your request, we regret to inform you that your university "
-              + "registration request has been <strong style=\"color:#e74c3c;\">declined</strong>.</p>"
-              + reasonSection
-              + "<p>If you believe this decision was made in error or would like to reapply, "
-              + "please contact our support team.</p>");
+                        + "<p>After reviewing your request, we regret to inform you that your university "
+                        + "registration request has been <strong style=\"color:#e74c3c;\">declined</strong>.</p>"
+                        + reasonSection
+                        + "<p>If you believe this decision was made in error or would like to reapply, "
+                        + "please contact our support team.</p>");
     }
 
     private String buildNotificationBody(String firstName, String message) {
         return layout("A Notification from Your Lecturer",
                 greeting(firstName)
-              + "<p>" + message + "</p>"
-              + "<p>Log in to the Action Learning Platform to view the details.</p>");
+                        + "<p>" + message + "</p>"
+                        + "<p>Log in to the Action Learning Platform to view the details.</p>");
     }
 
     // ---- Shared building blocks (edit once, every email updates) ----
